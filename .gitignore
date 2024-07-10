@@ -160,3 +160,13 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+user_content/cache/*
+user_content/cast/*
+user_content/cast_photos/*
+user_content/comfy_workflow/*
+
+# everything except for a specific file in user_content/cast_photos/
+!/user_content/cast_photos/default.jpg
+!/user_content/cast/basic.json
+!/user_content/comfy_workflow/hi_res_photo.json
