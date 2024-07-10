@@ -170,3 +170,4 @@ user_content/comfy_workflow/*
 !/user_content/cast_photos/default.jpg
 !/user_content/cast/basic.json
 !/user_content/comfy_workflow/hi_res_photo.json
+!/user_content/cache/read_me.md

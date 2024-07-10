@@ -1,0 +1,1 @@
+This is where your Comfy-generation will be saved. Clean this regularly until cache-cleanup is implemented.
