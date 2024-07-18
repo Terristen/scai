@@ -4,10 +4,10 @@ from ollama_client import get_ollama_response_single
 from werkzeug.utils import secure_filename
 
 import json
+import re
 
 import websocket #NOTE: websocket-client (https://github.com/websocket-client/websocket-client)
 import uuid
-import json
 import urllib.request
 import urllib.parse
 import random
@@ -21,6 +21,59 @@ comfy_bp = Blueprint('comfy', __name__)
 def get_settings():
     settings = current_app.config['SETTINGS']
     return settings
+
+def sanitize_json_string(json_string):
+        # Use regex to find all string values in the JSON and apply the replacement
+        sanitized = re.sub(r'(?<!\\)"(.*?)(?<!\\)"', lambda m: m.group(0).replace(m.group(1), m.group(1).replace('"', '\"')), json_string)
+        return sanitized
+
+def get_comfy_prompt_data(character, chat_messages=[],prompt=None):
+    settings = get_settings()
+    analysis_model = settings['analyst_model']
+    
+    conversation_prompt = ""
+    if prompt:
+        conversation_prompt = prompt
+    else:
+        conversation_prompt = f"SYSTEM: Read the following conversation carefully from the perspective of {character['name']} so that you can respond to the prompt that follows:\n\n"
+        for message in chat_messages:
+            conversation_prompt += f"{message['character']}:\n{message['content']}\n\n"
+        
+        conversation_prompt += f"""
+        The character {character['name']} is described as follows:
+        Age:"{character['age']}"
+        Description:"{character['description']}"
+        \n\n
+        PROMPT: Respond with the following json object populated with the appropriate values for the character, '{character['name']}':
+        {{
+        "gender"="(male or female)",
+        "age"="(# years old)", 
+        "ethnicity"="(any description of ethnicity appropriate for the character)",
+        "description"="(important physical characteristics of the character such as hair color, eye color, height, etc.)",
+        "attitude"="(the mood or attitude of the character in the conversation at this point)", 
+        "pose"="(position or action the character is taking in the conversation at this point)", 
+        "attire"="(description of clothing the character is wearing in the conversation at this point; nude if no clothing is present)",
+        "environment"="(the setting of the conversation that the character is in at this point)", 
+        "lighting"="(a description of the lighting in the scene where the character is at this point in the conversation)"
+        }}
+        """
+        
+        response = get_ollama_response_single(analysis_model, conversation_prompt)
+        
+        #sometimes the AI adds extra to the response, so we need to strip it out. Use Regex to find the json object
+        pattern = r'\{.*?\}'
+        match = re.search(pattern, response, re.DOTALL)
+        if match:
+            # Extract the JSON string
+            response = match.group(0)
+        else:
+            print("no JSON object found")
+            
+        response = sanitize_json_string(response)
+        
+        print(response)
+        return response
+    
 
 
 #route to generate an image for a given character based on a fixed set of parameters only requires the character data object and the story array of messages
@@ -37,27 +90,33 @@ def generate():
         return jsonify({"status": "error", "message": "No character data provided"}), 400
     
     story_data = request.json.get("story", []) #for later use
+    prompt_data = json.loads(get_comfy_prompt_data(character_data,story_data, None))
+    #print(prompt_data)
+    
     
     character = CharacterData(
         character_data["name"],
         path.join(cast_photos_directory, character_data["icon"]),
         "8k ultra-detailed high contrast close-up portrait",
-        "professionally lit with a soft key light and a fill light",
-        character_data["gender"],
-        f"{character_data['age']} years old",
-        character_data["ethnicity"],
-        "young beautiful girl with short brown hair and a cute smile",
-        "friendly and approachable with a hint of mischief in their eyes",
-        "looking directly at the camera",
-        "{office|bedroom|living-room|kitchen|outdoors|studio|beach|forest|mountains|city|suburbs}",
-        "{casual|business casual|formal|athletic|swimwear|sleepwear|costume|uniform}")
+        prompt_data["lighting"],
+        prompt_data["gender"],
+        f"{prompt_data['age']} years old",
+        prompt_data["ethnicity"],
+        prompt_data["description"],
+        prompt_data["attitude"],
+        prompt_data["pose"],
+        prompt_data["environment"],
+        prompt_data["attire"])
     
-    print(character.portrait)
+    if(character_data.get("sfw", True) == False):
+        character.sfw = False
+    
+    #print(character.portrait)
     files = get_character_photo(character, image_workflow, server_address, cache_directory)
     return jsonify(files)
 
 class CharacterData:
-    def __init__(self, name, portrait, style, lighting, gender, age, ethnicity, description, attitude, pose, environment, attire):
+    def __init__(self, name, portrait, style, lighting, gender, age, ethnicity, description, attitude, pose, environment, attire, sfw=True):
         self.name = name
         self.portrait = portrait
         self.style = style
@@ -70,6 +129,7 @@ class CharacterData:
         self.pose = pose
         self.environment = environment
         self.attire = attire
+        self.sfw = sfw
 
 server_address = "127.0.0.1:8188"
 client_id = str(uuid.uuid4())
@@ -157,7 +217,7 @@ def get_character_photo(character_data, workflow, server_address, output_folder,
     upload_image(character_data.portrait, comfy_filename, server_address, "input", True)
     
     ## specialized to the workflow I've created TODO: generalize this to all other workflows with different node structures
-    prompt["4"]["inputs"]["text"] = f"""
+    prompt["59"]["inputs"]["prompt"] = f"""
     style={character_data.style},
     lighting={character_data.lighting},
     gender={character_data.gender},
@@ -169,6 +229,12 @@ def get_character_photo(character_data, workflow, server_address, output_folder,
     environment={character_data.environment}, 
     attire={character_data.attire}
     """
+    
+    if character_data.sfw:
+        prompt["59"]["inputs"]["prompt"] += ", details=(SFW:1.5)"
+        prompt["57"]["inputs"]["prompt"] += ", details=(Nude:1.5), (NSFW:1.5), sex, nudity"
+        
+    
     #set the seed for our KSampler node
     prompt["6"]["inputs"]["seed"] = random.randint(0, 999999999) if seed is None else seed
     

@@ -1,5 +1,7 @@
 Flask==2.0.1
 Flask-JSON==0.3.4
-ollama-client==1.0.0
+ollama
 websocket-client
 requests-toolbelt
+werkzeug==2.0.3
+aiohttp

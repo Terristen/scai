@@ -4,9 +4,15 @@ class Chat {
         this.characterTemplate = Handlebars.compile(document.getElementById('character-template').innerHTML);
 
         this.master_conversation = [];
+        this.currentCast = 'default.json';
         this.characters = [];
-        this.currentCast = 'characters.json';
+        this.lore = "";
+        this.title = "";
+        this.setting = "";
+
         //this.cast_photo_base_url = window.cast_photo_base_url;
+        this.currentImageIndex = 0;
+        this.images = [];
 
         Handlebars.registerHelper('displayName', function (role, username, character) {
             return role === 'user' ? username : character;
@@ -54,8 +60,8 @@ class Chat {
         });
     }
 
-    /// Gets the list of characters for a given cast file name. Defaults to characters.json
-    fetchCharacters(cast="characters.json") {
+    /// Gets the list of characters for a given cast file name. Defaults to default.json
+    fetchCharacters(cast="default.json") {
         const url = new URL('/character/get_characters', window.location.origin);
         if (cast) {
             // Encode the cast parameter to ensure it's URL-safe
@@ -316,12 +322,22 @@ class Chat {
         document.getElementById('portraitContainer').innerHTML = `<img src="${imageUrl}" alt="Portrait">`;
     }
 
+    // addGeneratedImage(imageUrl) {
+    //     const tpl = Handlebars.compile(document.getElementById('image-template').innerHTML);
+    //     const newImage = tpl({ url: imageUrl });
+    //     const cont = document.getElementById('generatedImages');
+    //     cont.innerHTML += newImage;
+    //     cont.scrollTop = cont.scrollHeight;
+    // }
+    
     addGeneratedImage(imageUrl) {
         const tpl = Handlebars.compile(document.getElementById('image-template').innerHTML);
         const newImage = tpl({ url: imageUrl });
         const cont = document.getElementById('generatedImages');
         cont.innerHTML += newImage;
         cont.scrollTop = cont.scrollHeight;
+        this.images.push(imageUrl);
+        this.addImageClickListeners();
     }
 
 
@@ -361,5 +377,42 @@ class Chat {
             }
         });
     }
+
+
+    ///Carousel Functions
+    addImageClickListeners() {
+        const imageElements = document.querySelectorAll('#generatedImages img');
+        imageElements.forEach((img, index) => {
+            img.onclick = () => this.openImageCarousel(index);
+        });
+    }
+    
+    openImageCarousel(index) {
+        this.currentImageIndex = index;
+        const modal = document.getElementById('imageCarouselModal');
+        const carouselImage = document.getElementById('carouselImage');
+        modal.style.display = 'flex';
+        carouselImage.src = this.images[this.currentImageIndex];
+    }
+    
+    closeModal() {
+        const modal = document.getElementById('imageCarouselModal');
+        modal.style.display = 'none';
+    }
+    
+    showNextImage() {
+        
+        window.chatInstance.currentImageIndex = (window.chatInstance.currentImageIndex + 1) % window.chatInstance.images.length;
+        const carouselImage = document.getElementById('carouselImage');
+        carouselImage.src = window.chatInstance.images[window.chatInstance.currentImageIndex];
+    }
+    
+    showPrevImage() {
+        window.chatInstance.currentImageIndex = (window.chatInstance.currentImageIndex - 1 + window.chatInstance.images.length) % window.chatInstance.images.length;
+        const carouselImage = document.getElementById('carouselImage');
+        carouselImage.src = window.chatInstance.images[window.chatInstance.currentImageIndex];
+    }
+    
+    
 
 }

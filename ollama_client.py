@@ -1,5 +1,7 @@
 import ollama
 from flask import current_app, jsonify
+#import aiohttp
+#import asyncio
 
 def get_client():
     settings = current_app.config['SETTINGS']

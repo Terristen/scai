@@ -19,4 +19,17 @@ document.addEventListener('DOMContentLoaded', function () {
         window.chatInstance.load_cast();
     });
 
+
+    ///Carousel Event Listeners
+    document.querySelector('.close').onclick = window.chatInstance.closeModal;
+    document.querySelector('.carousel-next').onclick = window.chatInstance.showNextImage;
+    document.querySelector('.carousel-prev').onclick = window.chatInstance.showPrevImage;
+    
+    window.onclick = (event) => {
+        const modal = document.getElementById('imageCarouselModal');
+        if (event.target === modal) {
+            window.chatInstance.closeModal();
+        }
+    };
+
 });

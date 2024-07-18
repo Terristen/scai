@@ -1,6 +1,9 @@
 from flask import Flask, render_template, send_from_directory, url_for
 from utils.character_utils import load_characters, save_characters
 from utils.app_utils import load_settings
+import atexit
+import os
+import glob
 
 def create_app():
     app = Flask(__name__)
@@ -37,7 +40,23 @@ def create_app():
     def cache(filename):
         return send_from_directory(temp_cache_directory, filename)
     
+    
+    def cleanup_cache_directory():
+        """Delete all files in the cache directory."""
+        files = glob.glob(os.path.join(temp_cache_directory, '*'))
+        for f in files:
+            try:
+                os.remove(f)
+                print(f"Deleted file: {f}")
+            except OSError as e:
+                print(f"Error deleting file {f}: {e}")
+    
+    atexit.register(cleanup_cache_directory)
+    
     return app
+
+
+
 
 if __name__ == '__main__':
     app = create_app()

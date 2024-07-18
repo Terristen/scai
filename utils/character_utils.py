@@ -18,11 +18,11 @@ def get_settings():
     return settings
 
 #Ensure you use the filename.extension for the castname parameter to allow for YAML in the future
-def load_characters(castname="characters.json", create=True):
+def load_characters(castname="default.json", create=True):
     settings = current_app.config['SETTINGS']
     
     if not castname:
-        castname = settings.get("default_cast", "characters.json")
+        castname = settings.get("default_cast", "default.json")
 
     cast_file = castname
     cast_folder = settings.get("cast_of_characters_directory", "user_content/cast/")
