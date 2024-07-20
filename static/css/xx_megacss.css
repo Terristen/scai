@@ -1,0 +1,551 @@
+:root {
+    --theme-color: #3b82f6;
+    --bg-color: #1e1e1e;
+    --header-color: #2c2c2c;
+    --highlight-color: #6da2f8;
+    --tray-color: #3a3a3a;
+    --text-color: #e5e5e5;
+    --input-bg-color: #333;
+    --input-text-color: #fff;
+    --menu-text-color:#3a3a3a;
+    --button-disabled-color: #3a3a3a;
+}
+body {
+    margin: 0;
+    display: flex;
+    height: 100vh;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+    --flex-direction: column; /* Ensure the body is a column flex container */
+}
+.sidebar {
+    width: 60px;
+    background-color: var(--theme-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 0;
+}
+.sidebar i {
+    color: var(--text-color);
+    font-size: 24px;
+    margin: 20px 0;
+    cursor: pointer;
+}
+.sidebar i:hover {
+    color: var(--highlight-color);
+}
+.main-container {
+    display: flex;
+    flex: 1;
+    transition: width 0.5s ease-in-out;
+}
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%; /* Ensure chat-container takes full height */
+}
+.top-bar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: var(--header-color);
+}
+.top-bar input {
+    background-color: var(--input-bg-color);
+    color: var(--input-text-color);
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    margin-left: 10px;
+}
+.character-picture {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--input-bg-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-color);
+}
+
+.character-picture.username-icon {
+    background-color: var(--highlight-color) !important;
+    color: var(--text-color) !important;
+    border: none;
+    cursor: pointer !important;
+}
+
+.chat-area {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    background-color: var(--bg-color);
+    display: flex;
+    flex-direction: column;
+}
+.message {
+    margin-bottom: 10px;
+    word-wrap: break-word; /* Ensure messages wrap within the container */      
+}
+.message strong {
+    display: block;
+    margin-bottom: 5px;
+}
+.input-area {
+    display: flex;
+    align-items: flex-end;
+    padding: 10px;
+    background-color: var(--header-color);
+    position: relative;
+    flex-shrink: 0; /* Prevent shrinking */
+    border-top: 1px solid var(--tray-color); /* Add a border for visual separation */
+}
+.input-area textarea {
+    flex: 1;
+    background-color: var(--input-bg-color);
+    color: var(--input-text-color);
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    resize: none;
+    margin-right: 10px;
+    max-height: 200px; /* Set a max-height */
+    overflow-y: auto; /* Enable vertical scrolling */
+}
+
+.hamburger-menu {
+    margin-right: 10px;
+    cursor: pointer;
+    color: var(--text-color);
+}
+.hamburger-menu i {
+    font-size: 24px;
+    color: var(--menu--text-color);
+}
+
+.hamburger-menu-content {
+    position: absolute;
+    background-color: hsl(217 10% 30% / 1);
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    padding: 12px 16px;
+    z-index: 1;
+    border-radius: 5px; /* Rounded borders */
+    bottom: 100%; /* Position the menu just below the button */
+    left: 0;
+    transform: translateY(10px); /* Adjust this value to control the gap */
+    margin-bottom: 10px;
+}
+
+.hamburger-menu-content h4 {
+    margin-top: 0;
+}
+
+.hamburger-menu-content ul {
+    list-style: none;
+    padding: 0;
+}
+
+.hamburger-menu-content ul li {
+    margin: 10px 0;
+}
+
+.hamburger-menu-content kbd {
+    background-color: #eee;
+    border-radius: 3px;
+    border: 1px solid #b4b4b4;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.2), 0 0 0 2px #fff inset;
+    color: #333;
+    display: inline-block;
+    font-size: 0.85em;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 4px;
+    white-space: nowrap;
+}
+
+.send-button {
+    background-color: var(--highlight-color);
+    color: var(--text-color);
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.character-list {
+    width: 250px;
+    height: 100%;
+    background-color: var(--tray-color);
+    padding: 10px;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    transition: width 0.5s ease-in-out;
+}
+.character-list.show {
+    display: flex;
+}
+.character-card {
+    display: flex;
+    align-items: center;
+    background-color: var(--header-color);
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-bottom: 5px;
+}
+.character-card img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+.character-card .character-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex: 1;
+}
+.character-card p {
+    margin: 0;
+    color: var(--text-color);
+    text-align: center;
+}
+.character-card .personality-snippet {
+    font-size: 12px;
+    color: rgba(229, 229, 229, 0.8);
+    text-align: center;
+}
+.character-card .personality-snippet:hover {
+    color: var(--text-color);
+}
+
+
+
+.search-box {
+    display: flex;
+    align-items: center;
+    background-color: var(--input-bg-color);
+    padding: 5px 10px;
+    border-radius: 5px;
+}
+.search-box input {
+    background-color: var(--input-bg-color);
+    color: var(--input-text-color);
+    border: none;
+    flex: 1;
+    padding: 5px;
+}
+.search-box i {
+    color: var(--text-color);
+    margin-right: 10px;
+}
+.selected {
+    border: 2px solid var(--highlight-color);
+}
+
+#message {
+    overflow-y: hidden; /* Prevents scrollbar flash */
+    max-height: 200px; /* Example max height */
+}
+
+
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.popup-content {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 400px;
+    text-align: center;
+}
+
+
+/* Style for <pre> wrapping <code> */
+pre {
+    background-color: #333; /* Dark background */
+    color: #f8f8f2; /* Light text color */
+    border-radius: 4px; /* Rounded corners */
+    padding: 10px; /* Padding inside the code block */
+    overflow-x: auto; /* Horizontal scrolling for long lines */
+    font-family: 'Courier New', Courier, monospace; /* Monospace font for code */
+}
+
+/* Additional styling for <code> inside <pre> */
+pre code {
+    background-color: transparent; /* Ensure code background matches <pre> */
+    color: inherit; /* Inherit text color from <pre> */
+}
+
+
+
+
+/* Add this to your existing <style> block or in a separate CSS file */
+    .popup-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .popup-content {
+        background-color: var(--header-color);
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        width: 400px;
+        text-align: center;
+        color: var(--text-color);
+    }
+    
+    .popup-content h2 {
+        margin-top: 0;
+        color: var(--highlight-color);
+    }
+    
+    .popup-content p {
+        color: var(--text-color);
+    }
+    
+    .popup-content select,
+    .popup-content input[type="file"] {
+        background-color: var(--input-bg-color);
+        color: var(--text-color);
+        border: none;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+        width: calc(100% - 22px); /* Adjust for padding */
+    }
+    
+    .popup-content button {
+        background-color: var(--theme-color);
+        color: var(--text-color);
+        border: none;
+        padding: 10px;
+        border-radius: 5px;
+        cursor: pointer;
+        width: calc(100% - 22px); /* Adjust for padding */
+        margin: 10px 0;
+    }
+    
+    .popup-content button:hover {
+        background-color: var(--highlight-color);
+    }
+
+    .popup-content button:disabled {
+        background-color: var(--button-disabled-color);
+        cursor: not-allowed;
+    }
+
+
+    /* Styles for the image strip panel */
+    .chat-and-image-strip-container {
+        display: flex;
+        flex: 1;
+        overflow-y: hidden; /* Prevent overflow due to input area growth */
+    }
+    
+    .chat-area {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        background-color: var(--bg-color);
+        display: flex;
+        flex-direction: column;
+        scrollbar-width: thin; /* Makes the scrollbar narrower */
+        scrollbar-color: var(--highlight-color) var(--bg-color); /* Scrollbar thumb and track color */
+    }
+    
+    /* Custom scrollbar for WebKit-based browsers */
+    .chat-area::-webkit-scrollbar {
+        width: 8px; /* Width of the scrollbar */
+    }
+
+    .chat-area::-webkit-scrollbar-track {
+        background: var(--bg-color); /* Background of the scrollbar track */
+    }
+
+    .chat-area::-webkit-scrollbar-thumb {
+        background: var(--highlight-color); /* Color of the scrollbar thumb */
+        border-radius: 10px; /* Rounded corners */
+    }
+
+    .chat-area::-webkit-scrollbar-thumb:hover {
+        background: var(--theme-color); /* Color of the scrollbar thumb on hover */
+    }
+
+
+    .image-strip {
+        width: 200px;
+        height: 100%;
+        background-color: var(--tray-color);
+        display: none;
+        flex-direction: column;
+        transition: transform 0.3s ease-in-out;
+        --transform: translateX(100%);
+    }
+    
+    .image-strip.show {
+        display: flex;
+    }
+    
+    .portrait-container {
+        flex: 0 0 150px; /* Fixed height for portrait image */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-bottom: 1px solid var(--highlight-color);
+    }
+    
+    .portrait-container img {
+        max-height: 100%;
+        max-width: 100%;
+    }
+    
+    .generated-images {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+    }
+    
+    .generated-images img {
+        width: 100%;
+        margin-bottom: 10px;
+        border-radius: 5px;
+    }
+
+
+    /* cast editor styles */
+    .cast-editor {
+        display: none;
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 300px;
+        background: #fff;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        z-index: 1000;
+        padding: 20px;
+        overflow-y: auto;
+    }
+    
+    .editor-content {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .editor-content label {
+        margin-top: 10px;
+    }
+    
+    .editor-content input,
+    .editor-content textarea {
+        margin-bottom: 10px;
+        padding: 5px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    
+    #saveCastButton {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        cursor: pointer;
+    }
+    
+    #saveCastButton:hover {
+        background-color: #0056b3;
+    }
+
+    .carousel-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .carousel-content {
+        position: relative;
+        max-width: 90%;
+        max-height: 90%;
+    }
+
+    .carousel-content img {
+        width: 100%;
+        height: auto;
+        border-radius: 10px;
+    }
+
+    .close {
+        position: absolute;
+        top: 20px;
+        right: 30px;
+        color: white;
+        font-size: 40px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .carousel-prev,
+    .carousel-next {
+        cursor: pointer;
+        position: absolute;
+        top: 50%;
+        width: auto;
+        margin-top: -22px;
+        color: white;
+        font-weight: bold;
+        font-size: 40px;
+        transition: 0.6s ease;
+        user-select: none;
+    }
+
+    .carousel-prev {
+        left: 0;
+        border-radius: 0 3px 3px 0;
+    }
+
+    .carousel-next {
+        right: 0;
+        border-radius: 3px 0 0 3px;
+    }
+
+    .carousel-prev:hover,
+    .carousel-next:hover {
+        background-color: rgba(0, 0, 0, 0.8);
+    }

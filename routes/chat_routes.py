@@ -13,27 +13,32 @@ def get_settings():
     return settings
 
 
-def build_conversation_prompt(char, conversation, respondents):
+def build_conversation_prompt(char, conversation, respondents, title="", lore="", setting=""):
     conversation_prompt =  f"""
     Name: {char['name']}
     Age: {char['age']}
     Description: {char['description']}
     Personality: {char['personality']}
     
+    Story Title: {title}
+    World Lore: {lore}
+    
+    Story Setting: {setting}
+    
     Other NPCs in the Story: {[item for item in respondents if item != char['name']]}
         
-    Story:
+    The Story So Far:
     """ 
     
     for message in conversation:
         conversation_prompt += f"{message['character']}:\n {message['content']}\n\n"
     
     if(char['instructions'].strip() != ""):
-        conversation_prompt += f"Special Instructions to Follow: {char['instructions']}\n\n"
+        conversation_prompt += f"[SPECIAL CHARACTER INSTRUCTION: {char['instructions']}]\n\n"
         
     
     
-    conversation_prompt += "\n\n (IMPORTANT: Only respond as the character indicated.)" #TODO: Add a setting for max response length
+    conversation_prompt += "\n\n (IMPORTANT: Respond with only {char['name']}'s contribution.)" #TODO: Add a setting for max response length
     return conversation_prompt
 
 
@@ -42,6 +47,9 @@ def get_character_message():
     
     respondents = request.json.get("respondents", [])
     conversation = request.json.get("conversation", [])
+    title = request.json.get("title", "")
+    lore = request.json.get("lore", "")
+    setting = request.json.get("setting", "")
     
     if len(respondents) == 0:
         return jsonify({"status": "error", "message": "No respondents provided"}), 400
@@ -60,7 +68,7 @@ def get_character_message():
         return jsonify({"status": "error", "message": "Character not found"}), 400
     
     
-    conversation_prompt = build_conversation_prompt(char, conversation, respondents)
+    conversation_prompt = build_conversation_prompt(char, conversation, respondents, title, lore, setting)
     
     assistant_message = get_ollama_response_single(char['model'], conversation_prompt)
     assistant_message = strip_name_from_message(assistant_message, respondents)
@@ -78,7 +86,7 @@ def AITurnPickNextCharacter(respondents, chat_messages=[], turn=3, prompt=None):
 
     names = ", ".join(characters)
     
-    conversation_prompt = ""
+    conversation_prompt = "Read the story so far and decide who should speak next.\n\nThe Story So Far:\n"
     if prompt:
         conversation_prompt = prompt
     else:
@@ -86,7 +94,7 @@ def AITurnPickNextCharacter(respondents, chat_messages=[], turn=3, prompt=None):
             #print(f"Message: {message}")
             conversation_prompt += f"{message['character']}:\n {message['content']}\n\n"
         
-        conversation_prompt += f"Respond with only one of these character names {names}\n: "
+        conversation_prompt += f"Your response will contain only one name from this list: {names}\n: "
     
     
     

@@ -1,41 +1,41 @@
 document.addEventListener('DOMContentLoaded', function () {
     
-    /// sendMessage shortcut
+    // sendMessage shortcut
     document.addEventListener('keydown', function(event) {
         if (event.ctrlKey && event.key === 'Enter') {
             window.chatInstance.sendMessage();
         }
     });
 
-    /// regenerateLastMessage shortcut
+    // regenerateLastMessage shortcut
     document.addEventListener('keydown', function(event) {
         if (event.altKey && event.key === 'Enter') {
             window.chatInstance.regenerateLastMessage();
         }
     });
 
-    /// deleteLastMessage shortcut
+    // deleteLastMessage shortcut
     document.addEventListener('keydown', function(event) {
         if (event.ctrlKey && event.shiftKey && event.key === 'Backspace') {
             window.chatInstance.deleteLastMessage();
         }
     });
 
-    /// copy last message to user input shortcut
+    // copy last message to user input shortcut
     document.addEventListener('keydown', function(event) {
         if (event.ctrlKey && event.shiftKey && event.key === 'K') {
             window.chatInstance.copyLastMessageToInput();
         }
     });
 
-    /// replaceLastMessage shortcut
+    // replaceLastMessage shortcut
     document.addEventListener('keydown', function(event) {
         if (event.ctrlKey && event.shiftKey && event.key === 'L') {
             window.chatInstance.replaceLastMessage();
         }
     });
 
-    /// toggleCharacterList shortcut
+    // toggleCharacterList shortcut
     document.addEventListener('keydown', function(event) {
         if (event.altKey && event.key === '1') {
             event.preventDefault();
@@ -43,23 +43,31 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    /// toggleCastWindow shortcut
+    // toggleCastWindow shortcut
     document.addEventListener('keydown', function(event) {
-        if (event.altKey && event.key === '2') {
+        if (event.altKey && event.key === '3') {
             event.preventDefault();
             window.chatInstance.toggleCastWindow();
         }
     });
 
-    /// toggleImageStrip shortcut
+    // toggleConversationWindow shortcut
     document.addEventListener('keydown', function(event) {
-        if (event.altKey && event.key === '3') {
+        if (event.altKey && event.key === '4') {
+            event.preventDefault();
+            window.chatInstance.toggleConversationWindow();
+        }
+    });
+
+    // toggleImageStrip shortcut
+    document.addEventListener('keydown', function(event) {
+        if (event.altKey && event.key === '2') {
             event.preventDefault();
             window.chatInstance.toggleImageStrip();
         }
     });
 
-    /// generateCharacterImage shortcut
+    // generateCharacterImage shortcut
     document.addEventListener('keydown', function(event) {
         if (event.ctrlKey && event.key === 'I') {
             event.preventDefault();

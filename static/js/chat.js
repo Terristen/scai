@@ -1,52 +1,79 @@
 class Chat {
     constructor() {
+        this.initTemplates();
+        this.initHelpers();
+        this.initVariables();
+        this.initialFetches();
+    }
+
+    /**
+     * Initialize Handlebars templates
+     */
+    initTemplates() {
         this.chatTemplate = Handlebars.compile(document.getElementById('chat-template').innerHTML);
         this.characterTemplate = Handlebars.compile(document.getElementById('character-template').innerHTML);
+    }
 
-        this.master_conversation = [];
-        this.currentCast = 'default.json';
-        this.characters = [];
-        this.lore = "";
-        this.title = "";
-        this.setting = "";
-
-        //this.cast_photo_base_url = window.cast_photo_base_url;
-        this.currentImageIndex = 0;
-        this.images = [];
-
-        Handlebars.registerHelper('displayName', function (role, username, character) {
+    /**
+     * Register Handlebars helpers
+     */
+    initHelpers() {
+        Handlebars.registerHelper('displayName', (role, username, character) => {
             return role === 'user' ? username : character;
         });
 
-        Handlebars.registerHelper('iconRender', function (icon) {
+        Handlebars.registerHelper('iconRender', (icon) => {
             return window.cast_photo_base_url + (icon === '' ? 'default.jpg' : icon);
         });
 
-
-        Handlebars.registerHelper('markdown', function(text) {
+        Handlebars.registerHelper('markdown', (text) => {
             return new Handlebars.SafeString(marked.parse(text));
         });
+    }
 
-        // Initial Fetches
+    /**
+     * Initialize class variables
+     */
+    initVariables() {
+        this.masterConversation = [];
+        this.currentCast = 'default.json';
+        this.characters = [];
+        this.images = [];
+        this.currentImageIndex = 0;
+        this.title = '';
+        this.lore = '';
+        this.setting = '';
+    }
+
+    /**
+     * Perform initial data fetches
+     */
+    initialFetches() {
         this.renderChat();
         this.fetchCharacters();
     }
 
-    /// forces a rerender of the chat window with the current conversation
-    renderChat(messages=[]) {
-        if(messages.length == 0) {
-            messages = this.master_conversation;
-        } 
+    /**
+     * Render chat messages
+     * @param {Array} messages - Array of messages to render
+     */
+    renderChat(messages = []) {
+        if (messages.length === 0) {
+            messages = this.masterConversation;
+        }
         const username = document.getElementById('username').value || 'User';
         const chatArea = document.getElementById('chatArea');
-        chatArea.innerHTML = this.chatTemplate({ messages: messages, username: username });
+        chatArea.innerHTML = this.chatTemplate({ messages, username });
         chatArea.scrollTop = chatArea.scrollHeight;
-        
-        if(hljs != undefined) {
+
+        if (hljs) {
             hljs.highlightAll();
         }
     }
 
+    /**
+     * Render character list
+     */
     renderCharacters() {
         const characterList = document.getElementById('characterList');
         characterList.innerHTML = this.characterTemplate({ characters: this.characters });
@@ -60,125 +87,126 @@ class Chat {
         });
     }
 
-    /// Gets the list of characters for a given cast file name. Defaults to default.json
-    fetchCharacters(cast="default.json") {
-        const url = new URL('/character/get_characters', window.location.origin);
-        if (cast) {
-            // Encode the cast parameter to ensure it's URL-safe
-            const encodedCast = encodeURIComponent(cast);
-            url.searchParams.append('cast', encodedCast);
-        }
-        fetch(url, { 
+    /**
+     * Fetch character data and cast metadata
+     * @param {string} cast - Cast file name
+     */
+    fetchCharacters(cast = "default.json") {
+        const url = new URL('/character/get_cast', window.location.origin);
+        url.searchParams.append('cast', encodeURIComponent(cast));
+        fetch(url, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
             }
         })
-            .then(response => response.json())
-            .then(data => {
-                this.characters = data.map(character => ({
-                    ...character,
-                    selected: false,
-                    personalitySnippet: character.personality.substring(0, 20) + '...'
-                }));
-                this.renderCharacters();
-            });
+        .then(response => response.json())
+        .then(data => {
+            this.title = data.title;
+            this.lore = data.lore;
+            this.setting = data.setting;
+            this.characters = data.cast.map(character => ({
+                ...character,
+                selected: false,
+                personalitySnippet: `${character.personality.substring(0, 20)}...`
+            }));
+            this.renderCharacters();
+        });
     }
 
-    /// saves the current message into the conversation and prompts the server for an AI response. Name is a little confusing because the server doesn't care or keep track of the message list; leftover from previous implementation
-    sendMessage(forcePass=false) {
-        const message = document.getElementById('message').value;
+    /**
+     * Send a message
+     * @param {boolean} forcePass - Whether to force pass the message
+     */
+    sendMessage(forcePass = false) {
+        const message = document.getElementById('message').value.trim();
         const username = document.getElementById('username').value || 'User';
-        //const respondents = this.characters.filter(character => character.selected).map(character => character.name);
         const respondents = this.characters.filter(character => character.selected);
-        const newMsg = {"role": "user", "content": message, "character": username};
-        
 
-        if(!forcePass){
-            if (message.trim() !== '') {
-                this.master_conversation.push(newMsg);
-                this.renderChat();
-                document.getElementById('message').value = '';
-                this.autoGrowTextArea();
-            }
+        if (!forcePass && message) {
+            const newMsg = { role: "user", content: message, character: username };
+            this.masterConversation.push(newMsg);
+            this.renderChat();
+            document.getElementById('message').value = '';
+            this.autoGrowTextArea();
         }
 
-        return fetch('/chat/get_character_message', {
+        if(respondents.length === 0) {
+            return;
+        }
+
+        fetch('/chat/get_character_message', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                respondents: respondents,
-                conversation: this.master_conversation
+                respondents,
+                conversation: this.masterConversation,
+                title: this.title,
+                lore: this.lore,
+                setting: this.setting
             }),
         })
         .then(response => response.json())
-        .then((data) => {
-            console.log(data);
-            this.master_conversation.push(data.assistant_message);
+        .then(data => {
+            this.masterConversation.push(data.assistant_message);
             this.renderChat();
-            let answeringCharacter = this.characters.find(character => character.name === data.assistant_message.character);
+            const answeringCharacter = this.characters.find(character => character.name === data.assistant_message.character);
             if (answeringCharacter) {
                 this.addPortraitImage(window.cast_photo_base_url + answeringCharacter.icon);
             }
         });
-        
     }
 
-    toggleCharacterList_orig() {
-        const characterList = document.getElementById('characterListHolder');
-        if (characterList.classList.contains('show')) {
-            characterList.classList.remove('show');
-            document.querySelector('.main-container').style.width = 'calc(100% - 60px)';
-        } else {
-            characterList.classList.add('show');
-            document.querySelector('.main-container').style.width = 'calc(100% - 310px)';
-        }
-    }
-
+    /**
+     * Toggle character list visibility
+     */
     toggleCharacterList() {
         const characterList = document.getElementById('characterListHolder');
-        if (characterList.classList.contains('show')) {
-            characterList.classList.remove('show');
-            //document.querySelector('.main-container').style.width = 'calc(100% - 60px)';
-        } else {
-            characterList.classList.add('show');
-            //document.querySelector('.main-container').style.width = 'calc(100% - 310px)';
-        }
+        characterList.classList.toggle('show');
     }
-    
 
-    /// Force the last message to be regenerated and re-render the chat
+    /**
+     * Regenerate the last message
+     */
     regenerateLastMessage() {
-        this.master_conversation.pop();
+        this.masterConversation.pop();
         this.sendMessage(true);
     }
 
+    /**
+     * Delete the last message
+     */
     deleteLastMessage() {
-        this.master_conversation.pop();
+        this.masterConversation.pop();
         this.renderChat();
     }
 
-    /// Replace the last message with the current value of the message input but don't change the character
+    /**
+     * Replace the last message with the current input value
+     */
     replaceLastMessage() {
-        const replacement_message = document.getElementById('message').value;
-        
+        const replacementMessage = document.getElementById('message').value;
         document.getElementById('message').value = '';
         this.autoGrowTextArea();
 
-        this.master_conversation[this.master_conversation.length - 1].content = replacement_message;
+        this.masterConversation[this.masterConversation.length - 1].content = replacementMessage;
         this.renderChat();
     }
 
-    /// changes the text of the send button to tell user if they are sending a message or passing their turn
+    /**
+     * Update send button text based on message input
+     */
     handleSendButtonText() {
         const sendButton = document.getElementById('sendButton');
         const messageInput = document.getElementById('message');
         sendButton.textContent = messageInput.value.trim() ? 'Send' : 'Pass';
     }
 
-    /// Save the username to the server
+    /**
+     * Save the username to the server
+     */
     handleUsernameSave() {
         const username = document.getElementById('username').value;
         fetch('/character/save_username', {
@@ -186,68 +214,54 @@ class Chat {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                username: username
-            }),
+            body: JSON.stringify({ username }),
         })
-        .then(response => response.json());   
+        .then(response => response.json());
     }
 
-    /// Copy the last message to the input box. Usually used in conjunction with replaceLastMessage to edit the last message
+    /**
+     * Copy the last message to the input box
+     */
     copyLastMessageToInput() {
-        const lastMessage = this.master_conversation[this.master_conversation.length - 1].content;
+        const lastMessage = this.masterConversation[this.masterConversation.length - 1].content;
         document.getElementById('message').value = lastMessage;
         this.autoGrowTextArea();
     }
 
-    /// Automatically adjust the height of the textarea based on the content
-    autoGrowTextArea_orig() {
-        let messageElement = document.getElementById('message');
-        // Reset height to ensure we're not restricted by previous height
-        messageElement.style.height = 'auto';
-        if (messageElement.value.trim() === '') {
-            // If textarea is empty, reset to default height (e.g., 20px or the original height)
-            //messageElement.style.height = '20px'; // Adjust this value to match your design's initial height
-            messageElement.rows = 1;
-        } else {
-            // Set height based on scroll height, but not more than max-height
-            messageElement.style.height = Math.min(messageElement.scrollHeight, 200) + 'px'; // 200px is the max-height
-        }
-    }
-
+    /**
+     * Automatically adjust the height of the textarea
+     */
     autoGrowTextArea() {
-        let messageElement = document.getElementById('message');
+        const messageElement = document.getElementById('message');
         messageElement.style.height = 'auto';
-        messageElement.style.height = Math.min(messageElement.scrollHeight, 200) + 'px';
+        messageElement.style.height = `${Math.min(messageElement.scrollHeight, 200)}px`;
     }
 
-    /// Toggle the hamburger menu visibility
-    toggleHamburgerMenu() {
-        var menuContent = document.querySelector('.hamburger-menu-content');
-        if (menuContent.style.display === 'none') {
-            menuContent.style.display = 'block';
-        } else {
-            menuContent.style.display = 'none';
-        }
+    /**
+     * Toggle shortcut menu visibility
+     */
+    toggleShortcutMenu() {
+        const menuContent = document.querySelector('.shortcut-menu-content');
+        menuContent.style.display = menuContent.style.display === 'none' ? 'block' : 'none';
     }
 
-    ///function to pull the list of character casts from the server via characters/get_cast_list: returns a list of filename.extention
+    /**
+     * Get the list of character casts
+     * @returns {Promise<Array>} - List of casts
+     */
     async getCastList() {
-        const response = await fetch('/character/get_cast_list', {
-            method: 'GET'
-        });
-        const data = await response.json();
-        return data;
+        const response = await fetch('/character/get_cast_list', { method: 'GET' });
+        return response.json();
     }
-    
-    ///function to populate the castSelector dropdown with the list of character casts
+
+    /**
+     * Populate the cast selector dropdown
+     */
     async populateCastSelector() {
         const castSelector = document.getElementById('castSelector');
-        // Clear the castSelector
         castSelector.innerHTML = '';
-    
-        const casts = await this.getCastList(); // Wait for the getCastList function to complete
-        
+
+        const casts = await this.getCastList();
         casts.forEach(cast => {
             const option = document.createElement('option');
             option.value = cast;
@@ -259,19 +273,22 @@ class Chat {
         });
     }
 
-    ///WIP
-    async load_cast(filename = '') {
-        if (filename === '') {
-            const castSelector = document.getElementById('castSelector');
-            filename = castSelector.value;
+    /**
+     * Load a specific cast
+     * @param {string} filename - Cast filename
+     */
+    async loadCast(filename = '') {
+        if (!filename) {
+            filename = document.getElementById('castSelector').value;
         }
-        
+
         this.currentCast = filename;
-        
         this.fetchCharacters(this.currentCast);
     }
 
-    ///WIP
+    /**
+     * Handle cast upload form
+     */
     async handleCastUploadForm() {
         const castUpload = document.getElementById('castUpload');
         const file = castUpload.files[0];
@@ -279,7 +296,7 @@ class Chat {
             const filename = file.name;
             const formData = new FormData();
             formData.append('cast_file', file);
-    
+
             try {
                 const response = await fetch('/character/upload_cast', {
                     method: 'POST',
@@ -287,49 +304,58 @@ class Chat {
                 });
                 const data = await response.json();
                 console.log('Success:', data);
-                await this.load_cast(filename); // Wait for load_cast to complete
-                await this.populateCastSelector(); // Wait for populateCastSelector to complete if it's async
+                await this.loadCast(filename);
+                await this.populateCastSelector();
             } catch (error) {
                 console.error('Error:', error);
             }
         }
     }
 
-    toggleCastWindow(){
+    /**
+     * Toggle cast management window visibility
+     */
+    toggleCastWindow() {
         const popup = document.getElementById('castManagementPopup');
-        const isDisplayed = castManagementPopup.style.display !== 'none';
+        const isDisplayed = popup.style.display !== 'none';
         popup.style.display = isDisplayed ? 'none' : 'flex';
         if (!isDisplayed) {
             this.populateCastSelector();
         }
     }
 
+    /**
+     * Get a character by name
+     * @param {string} name - Character name
+     * @returns {Object} - Character object
+     */
     getCharacterByName(name) {
         return this.characters.find(character => character.name === name);
     }
 
-    
-
-    /*
+    /**
      * Image Strip Functions
      */
 
+    /**
+     * Toggle image strip visibility
+     */
     toggleImageStrip() {
         document.getElementById('imageStrip').classList.toggle('show');
     }
 
+    /**
+     * Add portrait image to the portrait container
+     * @param {string} imageUrl - Image URL
+     */
     addPortraitImage(imageUrl) {
         document.getElementById('portraitContainer').innerHTML = `<img src="${imageUrl}" alt="Portrait">`;
     }
 
-    // addGeneratedImage(imageUrl) {
-    //     const tpl = Handlebars.compile(document.getElementById('image-template').innerHTML);
-    //     const newImage = tpl({ url: imageUrl });
-    //     const cont = document.getElementById('generatedImages');
-    //     cont.innerHTML += newImage;
-    //     cont.scrollTop = cont.scrollHeight;
-    // }
-    
+    /**
+     * Add generated image to the container
+     * @param {string} imageUrl - Image URL
+     */
     addGeneratedImage(imageUrl) {
         const tpl = Handlebars.compile(document.getElementById('image-template').innerHTML);
         const newImage = tpl({ url: imageUrl });
@@ -340,53 +366,56 @@ class Chat {
         this.addImageClickListeners();
     }
 
-
-    /*
-     * Image Generation Functions
+    /**
+     * Generate character image
      */
     generateCharacterImage() {
         console.log("Generating Character Image");
         let lastCharacter = null;
 
-        for(let m = this.master_conversation.length - 1; m >= 0; m--) {
-            if(this.master_conversation[m].role == "assistant") {
-                lastCharacter = this.getCharacterByName(this.master_conversation[m].character);
+        for (let i = this.masterConversation.length - 1; i >= 0; i--) {
+            if (this.masterConversation[i].role === "assistant") {
+                lastCharacter = this.getCharacterByName(this.masterConversation[i].character);
                 break;
             }
         }
-        
-        if(lastCharacter == null) {
-            return;
-        }
+
+        if (!lastCharacter) return;
 
         fetch('/comfy/generate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                character: lastCharacter
-            }),
+            body: JSON.stringify({ character: lastCharacter }),
         })
         .then(response => response.json())
-        .then((data) => {
-            
-            if(data.length > 0) {
-                var url = "/cache/" + data[0];
+        .then(data => {
+            if (data.length > 0) {
+                const url = `/cache/${data[0]}`;
                 this.addGeneratedImage(url);
             }
         });
     }
 
+    /**
+     * Carousel Functions
+     */
 
-    ///Carousel Functions
+    /**
+     * Add click listeners to generated images
+     */
     addImageClickListeners() {
         const imageElements = document.querySelectorAll('#generatedImages img');
         imageElements.forEach((img, index) => {
             img.onclick = () => this.openImageCarousel(index);
         });
     }
-    
+
+    /**
+     * Open image carousel
+     * @param {number} index - Image index
+     */
     openImageCarousel(index) {
         this.currentImageIndex = index;
         const modal = document.getElementById('imageCarouselModal');
@@ -394,25 +423,162 @@ class Chat {
         modal.style.display = 'flex';
         carouselImage.src = this.images[this.currentImageIndex];
     }
-    
+
+    /**
+     * Close image carousel modal
+     */
     closeModal() {
         const modal = document.getElementById('imageCarouselModal');
         modal.style.display = 'none';
     }
-    
-    showNextImage() {
-        
-        window.chatInstance.currentImageIndex = (window.chatInstance.currentImageIndex + 1) % window.chatInstance.images.length;
-        const carouselImage = document.getElementById('carouselImage');
-        carouselImage.src = window.chatInstance.images[window.chatInstance.currentImageIndex];
-    }
-    
-    showPrevImage() {
-        window.chatInstance.currentImageIndex = (window.chatInstance.currentImageIndex - 1 + window.chatInstance.images.length) % window.chatInstance.images.length;
-        const carouselImage = document.getElementById('carouselImage');
-        carouselImage.src = window.chatInstance.images[window.chatInstance.currentImageIndex];
-    }
-    
-    
 
+    /**
+     * Show next image in the carousel
+     */
+    showNextImage() {
+        this.currentImageIndex = (this.currentImageIndex + 1) % this.images.length;
+        const carouselImage = document.getElementById('carouselImage');
+        carouselImage.src = this.images[this.currentImageIndex];
+    }
+
+    /**
+     * Show previous image in the carousel
+     */
+    showPrevImage() {
+        this.currentImageIndex = (this.currentImageIndex - 1 + this.images.length) % this.images.length;
+        const carouselImage = document.getElementById('carouselImage');
+        carouselImage.src = this.images[this.currentImageIndex];
+    }
+
+
+    /**
+     * Conversation Management Functions
+     */
+
+    /**
+     * Toggle conversation management window visibility
+     */
+    toggleConversationWindow() {
+        const popup = document.getElementById('conversationManagementPopup');
+        const isDisplayed = popup.style.display !== 'none';
+        popup.style.display = isDisplayed ? 'none' : 'flex';
+        this.updateConversationStats();
+    }
+
+    /**
+     * Save the current conversation as a JSON file
+     */
+    saveConversation() {
+        const fileName = prompt('Enter the conversation file name:', 'conversation.json');
+        if (!fileName) return;
+
+        const data = {
+            title: this.title,
+            lore: this.lore,
+            setting: this.setting,
+            conversation: this.masterConversation,
+            castFileName: this.currentCast
+        };
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName.endsWith('.json') ? fileName : `${fileName}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    /**
+     * Load a conversation from a JSON file
+     * @param {File} file - The JSON file containing the conversation data
+     */
+    loadConversation(file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const data = JSON.parse(event.target.result);
+            this.title = data.title;
+            this.lore = data.lore;
+            this.setting = data.setting;
+            this.masterConversation = data.conversation;
+            this.renderChat();
+
+            const loadCast = confirm('Would you like to load the cast file associated with this conversation?');
+            if (loadCast) {
+                this.fetchCharacters(data.castFileName);
+                this.currentCast = data.castFileName;
+            } else {
+                alert('Cast file not loaded. Continuing with current cast.');
+            }
+
+            this.updateConversationStats();
+        };
+        reader.readAsText(file);
+    }
+
+    /**
+     * Update conversation statistics in the UI
+     */
+    updateConversationStats() {
+        document.getElementById('currentCastName').innerText = this.currentCast;
+        document.getElementById('messageCount').innerText = this.masterConversation.length;
+
+        const uniqueCharacters = [...new Set(this.masterConversation.map(msg => msg.character))];
+        document.getElementById('uniqueCharacters').innerText = uniqueCharacters.join(', ');
+    }
+
+
+     /**
+     * Toggle the cast editor visibility
+     */
+     toggleCastEditor() {
+        const characterList = document.getElementById('castEditorHolder');
+        characterList.classList.toggle('show');
+    }
+
+    /**
+     * Populate the cast editor with the current cast details
+     */
+    populateCastEditor() {
+        document.getElementById('castFileName').value = this.currentCast;
+        document.getElementById('castTitle').value = this.title;
+        document.getElementById('castLore').value = this.lore;
+        document.getElementById('castSetting').value = this.setting;
+
+        const characterNames = this.characters.map(character => character.name).join(', ');
+        document.getElementById('castCharacters').value = characterNames;
+    }
+
+    /**
+     * Save the modified cast details to the server
+     */
+    saveCastDetails() {
+        const updatedCast = {
+            title: document.getElementById('castTitle').value,
+            lore: document.getElementById('castLore').value,
+            setting: document.getElementById('castSetting').value,
+            cast: this.characters
+        };
+
+        fetch('/character/save_cast', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                castFileName: this.currentCast,
+                castData: updatedCast
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Cast file saved successfully:', data);
+            // Optionally show a success message to the user
+        })
+        .catch(error => {
+            console.error('Error saving cast file:', error);
+            // Optionally show an error message to the user
+        });
+    }
 }

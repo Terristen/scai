@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from utils.character_utils import load_characters, save_characters, get_cast_list
+from utils.character_utils import load_character_cast, load_characters, save_characters, get_cast_list
 from utils.app_utils import load_settings, save_settings
 from werkzeug.utils import secure_filename
 import os
@@ -11,14 +11,14 @@ def get_settings():
     settings = current_app.config['SETTINGS']
     return settings
 
-@character_bp.route('/get_characters', methods=['GET'])
-def get_characters():
+@character_bp.route('/get_cast', methods=['GET'])
+def get_cast():
     cast_file = request.args.get("cast")
     if not cast_file:
         cast_file = current_app.config['SETTINGS']['default_cast']
     
-    characters = load_characters(castname=cast_file, create=False)
-    return jsonify(characters)
+    cast = load_character_cast(castname=cast_file)
+    return jsonify(cast)
 
 
 @character_bp.route('/save_username', methods=['POST'])
@@ -66,3 +66,20 @@ def upload_cast():
         return jsonify({"success": True})
     else:
         return jsonify({"error": "Invalid file format. Only JSON files are allowed."}), 400
+    
+    
+    ##route to take an updated cast object and save it to the cast file
+@character_bp.route('/save_cast', methods=['POST'])
+def save_cast():
+    cast = request.json.get("castData")
+    cast_file = request.json.get("castFileName")
+    
+    if not cast:
+        return jsonify({"error": "No cast object provided"}), 400
+    
+    if not cast_file:
+        return jsonify({"error": "No cast file provided"}), 400
+    
+    save_characters(cast, cast_file)
+    
+    return jsonify({"success": True})
