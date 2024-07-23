@@ -87,6 +87,15 @@
                     <div class="portrait-container" id="portraitContainer">
                         <!-- Full portrait image will be dynamically added here -->
                     </div>
+                    <div class="image-controls" id="imageControlsContainer">
+                        <!-- controls to change the width and height of generated images -->
+                        <label for="imageWidth">w:</label>
+                        <input type="number" id="imageWidth" value="768">
+                        <label for="imageHeight">h:</label>
+                        <input type="number" id="imageHeight" value="1024">
+                        <button id="generateImageButton">Generate</button>
+                        <span id="generationStatus" class="generation-status"></span>
+                    </div>
                     <div class="generated-images" id="generatedImages">
                         <!-- Generated images will be dynamically added here -->
                     </div>

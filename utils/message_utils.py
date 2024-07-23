@@ -1,4 +1,4 @@
-from flask import json
+from quart import json
 from utils.character_utils import get_character
 
 CharacterInstruction = """

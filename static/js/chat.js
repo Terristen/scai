@@ -369,8 +369,12 @@ class Chat {
     /**
      * Generate character image
      */
-    generateCharacterImage() {
+    generateCharacterImage(width = 768, height = 1024) {
         console.log("Generating Character Image");
+        const statusIndicator = document.getElementById('generationStatus');
+        
+        statusIndicator.className = 'generation-status loading';
+
         let lastCharacter = null;
 
         for (let i = this.masterConversation.length - 1; i >= 0; i--) {
@@ -387,14 +391,18 @@ class Chat {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ character: lastCharacter }),
+            body: JSON.stringify({ character: lastCharacter, story: this.masterConversation, width:width, height}),
         })
         .then(response => response.json())
         .then(data => {
-            if (data.length > 0) {
-                const url = `/cache/${data[0]}`;
+            if (data.files.length > 0) {
+                const url = `/cache/${data.files[0]}`;
+                console.log('Image Prompt:', data.character);
                 this.addGeneratedImage(url);
+                statusIndicator.className = 'generation-status success';
             }
+        }).catch(error => {
+            statusIndicator.className = 'generation-status error';
         });
     }
 
@@ -436,18 +444,20 @@ class Chat {
      * Show next image in the carousel
      */
     showNextImage() {
-        this.currentImageIndex = (this.currentImageIndex + 1) % this.images.length;
+        let instance = window.chatInstance;
+        instance.currentImageIndex = (instance.currentImageIndex + 1) % instance.images.length;
         const carouselImage = document.getElementById('carouselImage');
-        carouselImage.src = this.images[this.currentImageIndex];
+        carouselImage.src = instance.images[instance.currentImageIndex];
     }
 
     /**
      * Show previous image in the carousel
      */
     showPrevImage() {
-        this.currentImageIndex = (this.currentImageIndex - 1 + this.images.length) % this.images.length;
+        let instance = window.chatInstance;
+        instance.currentImageIndex = (instance.currentImageIndex - 1 + instance.images.length) % instance.images.length;
         const carouselImage = document.getElementById('carouselImage');
-        carouselImage.src = this.images[this.currentImageIndex];
+        carouselImage.src = instance.images[instance.currentImageIndex];
     }
 
 

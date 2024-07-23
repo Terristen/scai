@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, current_app
+from quart import Blueprint, request, jsonify, current_app
 from utils.character_utils import load_character_cast, load_characters, save_characters, get_cast_list
 from utils.app_utils import load_settings, save_settings
 from werkzeug.utils import secure_filename
@@ -12,7 +12,7 @@ def get_settings():
     return settings
 
 @character_bp.route('/get_cast', methods=['GET'])
-def get_cast():
+async def get_cast():
     cast_file = request.args.get("cast")
     if not cast_file:
         cast_file = current_app.config['SETTINGS']['default_cast']
@@ -22,8 +22,9 @@ def get_cast():
 
 
 @character_bp.route('/save_username', methods=['POST'])
-def save_username():
-    new_username = request.json.get("username")
+async def save_username():
+    data = await request.json
+    new_username = data.get("username")
     if new_username:
         settings = get_settings()
         settings["username"] = new_username
@@ -35,14 +36,14 @@ def save_username():
     
 
 @character_bp.route('/get_cast_list', methods=['GET'])
-def get_cast_list_handler():
+async def get_cast_list_handler():
     cast_files = get_cast_list()
     return jsonify(cast_files)
 
     
 ##route to take an uploaded cast file from a POST and save it to the cast_of_characters_directory
 @character_bp.route('/upload_cast', methods=['POST'])
-def upload_cast():
+async def upload_cast():
     if 'cast_file' not in request.files:
         return jsonify({"error": "No cast file provided"}), 400
     
@@ -70,9 +71,10 @@ def upload_cast():
     
     ##route to take an updated cast object and save it to the cast file
 @character_bp.route('/save_cast', methods=['POST'])
-def save_cast():
-    cast = request.json.get("castData")
-    cast_file = request.json.get("castFileName")
+async def save_cast():
+    data = await request.json
+    cast = data.get("castData")
+    cast_file = data.get("castFileName")
     
     if not cast:
         return jsonify({"error": "No cast object provided"}), 400

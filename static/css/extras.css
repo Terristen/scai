@@ -1,7 +1,7 @@
 
 
 .image-strip {
-    width: 200px;
+    width: 300px;
     height: 100%;
     background-color: var(--tray-color);
     display: none;
@@ -15,12 +15,85 @@
 }
 
 .portrait-container {
-    flex: 0 0 150px;
+    flex: 0 0 250px;
     display: flex;
     justify-content: center;
     align-items: center;
-    border-bottom: 1px solid var(--highlight-color);
+    border-bottom: 1px solid var(--bg-color);
 }
+
+.image-controls {
+    flex: 0 0 34px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-bottom: 1px solid var(--bg-color);
+    background-color: var(--header-color);
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.image-controls input {
+    width: 50px;
+    margin-right: 8px;
+}
+
+.image-controls label {
+    margin-right: 2px;
+}
+
+.image-controls button {
+    border-radius: 3px;
+    padding: 5px;
+    flex: 1;
+    color: var(--menu-text-color);
+    background-color: var(--theme-color-cool);
+    border: none;
+    cursor: pointer;
+}
+
+.image-controls button:hover {
+    background-color: var(--highlight-color);
+    color: #fff;
+}
+
+
+/* Define basic styles for the status indicator */
+.generation-status {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    vertical-align: middle;
+    margin-left: 10px;
+}
+
+/* Loading spinner */
+.generation-status.loading {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-left-color: #000;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Checkmark for success */
+.generation-status.success {
+    content: "\2714"; /* Unicode checkmark */
+    font-size: 24px;
+    color: green;
+}
+
+/* Warning triangle for error */
+.generation-status.error {
+    content: "\26A0"; /* Unicode warning triangle */
+    font-size: 24px;
+    color: red;
+}
+
+/* Keyframes for the loading spinner animation */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 
 .portrait-container img {
     max-height: 100%;

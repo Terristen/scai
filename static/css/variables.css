@@ -1,9 +1,10 @@
 :root {
     --theme-color: #3b82f6;
+    --theme-color-cool: #A7AABC;
     --bg-color: #1e1e1e;
     --header-color: #2c2c2c;
     --highlight-color: #6da2f8;
-    --tray-color: #3a3a3a;
+    --tray-color: #434656;
     --text-color: #e5e5e5;
     --input-bg-color: #333;
     --input-text-color: #fff;

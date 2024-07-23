@@ -76,4 +76,12 @@ document.addEventListener('DOMContentLoaded', function () {
             window.chatInstance.closeModal();
         }
     };
+
+
+    //image generation
+    document.getElementById('generateImageButton').addEventListener('click', () => {
+        const width = document.getElementById('imageWidth').value;
+        const height = document.getElementById('imageHeight').value;
+        window.chatInstance.generateCharacterImage(width, height);
+    });
 });

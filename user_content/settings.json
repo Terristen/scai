@@ -9,7 +9,9 @@
     "cast_photos_directory": "user_content/cast_photos/",
     "username": "Bryan",
     "comfy_ip": "127.0.0.1:8188",
-    "photo_workflow": "user_content/comfy_workflow/advanced_photo_workflow.json",
+    "photo_workflow": "user_content/workflows/fast_character_v2.py",
+    "default_photo_width": 768,
+    "default_photo_height": 1024,
     "cache_directory": "user_content/cache/"
 
 }

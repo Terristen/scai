@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, current_app
+from quart import Blueprint, request, jsonify, current_app, session
 from utils.app_utils import load_settings, save_settings
 from ollama_client import get_ollama_response_single
 from werkzeug.utils import secure_filename
@@ -16,18 +16,59 @@ from requests_toolbelt import MultipartEncoder
 from os import path
 from datetime import datetime
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
 comfy_bp = Blueprint('comfy', __name__)
+
+comfy_client_id = "ee9cc135-d22e-4c89-8b82-93e1f2c7dc62"
+comfy_ws = None
 
 def get_settings():
     settings = current_app.config['SETTINGS']
     return settings
 
-def sanitize_json_string(json_string):
-        # Use regex to find all string values in the JSON and apply the replacement
-        sanitized = re.sub(r'(?<!\\)"(.*?)(?<!\\)"', lambda m: m.group(0).replace(m.group(1), m.group(1).replace('"', '\"')), json_string)
-        return sanitized
+# Helper function to generate a unique client ID
+def generate_client_id():
+    global comfy_client_id
+    return comfy_client_id
+    #return str(uuid.uuid4())
 
-def get_comfy_prompt_data(character, chat_messages=[],prompt=None):
+@comfy_bp.before_app_request
+async def ensure_client_id():
+    if 'client_id' not in session:
+        session['client_id'] = generate_client_id()
+
+
+def sanitize_json_string(json_string):
+    lines = json_string.split('\n')
+    sanitized_lines = []
+
+    for line in lines:
+        # Match lines with key-value pairs
+        match = re.match(r'(\s*"\w+":\s*")(.*?)(?<!\\)(",?)$', line)
+        if match:
+            prefix = match.group(1)  # The key and the leading part of the value
+            value = match.group(2)   # The actual value to be sanitized
+            suffix = match.group(3)  # The trailing part after the value
+
+            # Escape double quotes within the value
+            
+            escaped_value = value.replace('"', '', -1)
+            
+            sanitized_line = f'{prefix}{escaped_value}{suffix}'
+            sanitized_lines.append(sanitized_line)
+        else:
+            # No key-value pair found, just add the line as is
+            sanitized_lines.append(line)
+
+    result = '\n'.join(sanitized_lines).strip()
+    if(result[-1] != '}'):
+        result += "}"
+    
+    return result
+
+async def get_comfy_prompt_data(character, chat_messages=[],prompt=None):
     settings = get_settings()
     analysis_model = settings['analyst_model']
     
@@ -35,16 +76,21 @@ def get_comfy_prompt_data(character, chat_messages=[],prompt=None):
     if prompt:
         conversation_prompt = prompt
     else:
-        conversation_prompt = f"SYSTEM: Read the following conversation carefully from the perspective of {character['name']} so that you can respond to the prompt that follows:\n\n"
+        conversation_prompt = f"""
+        SYSTEM: You are an AI performing a precise function to read a story and return a correctly-formed JSON object that describes the character and the scene as it appears in the latest part of the story.
+        Story So Far:
+        """
         for message in chat_messages:
-            conversation_prompt += f"{message['character']}:\n{message['content']}\n\n"
+            conversation_prompt += f"{message['content']}\n\n"
         
         conversation_prompt += f"""
-        The character {character['name']} is described as follows:
-        Age:"{character['age']}"
-        Description:"{character['description']}"
+        Your answers should describe the character: 
+        Name: {character['name']}
+        Age: {character['age']}
+        Description: {character['description']}
         \n\n
-        PROMPT: Respond with the following json object populated with the appropriate values for the character, '{character['name']}':
+        RESPONSE SCHEMA:
+        Use the following JSON object to describe the character and the scene as it appears in the latest part of the story. Use short descriptive phrases for each field. Do not include names or other information that is not visual in nature. Avoid using any punctuation or special characters in the descriptions.
         {{
         "gender"="(male or female)",
         "age"="(# years old)", 
@@ -58,7 +104,10 @@ def get_comfy_prompt_data(character, chat_messages=[],prompt=None):
         }}
         """
         
-        response = get_ollama_response_single(analysis_model, conversation_prompt)
+        #print("Prompt: \n" + conversation_prompt)
+        app_settings = current_app.config['SETTINGS']
+        
+        response = await get_ollama_response_single(analysis_model, conversation_prompt, app_settings)
         
         #sometimes the AI adds extra to the response, so we need to strip it out. Use Regex to find the json object
         pattern = r'\{.*?\}'
@@ -68,52 +117,83 @@ def get_comfy_prompt_data(character, chat_messages=[],prompt=None):
             response = match.group(0)
         else:
             print("no JSON object found")
-            
-        response = sanitize_json_string(response)
         
-        print(response)
+        #print("Response: ")
+        #print(response)
+        #print("Sanitized:")
+        #response = sanitize_json_string(response)
+        print(f"Image Prompt Generated: {character['name']}")
+        #print(response)
+        
         return response
     
 
 
 #route to generate an image for a given character based on a fixed set of parameters only requires the character data object and the story array of messages
 @comfy_bp.route('/generate', methods=['POST'])
-def generate():
+async def generate():
     settings = get_settings()
     server_address = settings.get("comfy_ip")
     image_workflow = settings.get("photo_workflow")
     cache_directory = settings.get("cache_directory")
     cast_photos_directory = settings.get("cast_photos_directory")
+    default_photo_width = settings.get("default_photo_width", 768)
+    default_photo_height = settings.get("default_photo_height", 1024)
     
-    character_data = request.json.get("character", None)
+    data = await request.json
+    
+    character_data = data.get("character", None)
     if(character_data is None):
         return jsonify({"status": "error", "message": "No character data provided"}), 400
     
-    story_data = request.json.get("story", []) #for later use
-    prompt_data = json.loads(get_comfy_prompt_data(character_data,story_data, None))
+    story_data = data.get("story", []) #for later use
+    
+    prompt = await get_comfy_prompt_data(character_data,story_data, None)
+    
+    
+    try:
+        prompt_data = json.loads(prompt)
+    except Exception as e:
+        prompt = sanitize_json_string(prompt)
+        try:
+            prompt_data = json.loads(prompt)
+        except Exception as e:            
+            print("Error: " + prompt)
+            return [], 400
     #print(prompt_data)
     
     
     character = CharacterData(
-        character_data["name"],
+        character_data.get("name"),
         path.join(cast_photos_directory, character_data["icon"]),
         "8k ultra-detailed high contrast close-up portrait",
-        prompt_data["lighting"],
-        prompt_data["gender"],
-        f"{prompt_data['age']} years old",
-        prompt_data["ethnicity"],
-        prompt_data["description"],
-        prompt_data["attitude"],
-        prompt_data["pose"],
-        prompt_data["environment"],
-        prompt_data["attire"])
+        prompt_data.get("lighting", "brightly lit"),
+        prompt_data.get("gender",""),
+        prompt_data.get("age", "0") + " years old",
+        prompt_data.get("ethnicity", "ethnically ambiguous"),
+        prompt_data.get("description", "average"),
+        prompt_data.get("attitude", "neutral"),
+        prompt_data.get("pose", "standing"),
+        prompt_data.get("environment", "photographic studio"),
+        prompt_data.get("attire", "casual")
+    )
     
     if(character_data.get("sfw", True) == False):
         character.sfw = False
     
+    ## TODO: parameterize the width and height of the image from settings
+    portrait_width = data.get("width", default_photo_width)
+    portrait_height = data.get("height", default_photo_height)
+    
     #print(character.portrait)
-    files = get_character_photo(character, image_workflow, server_address, cache_directory)
-    return jsonify(files)
+    files = await get_character_photo(character, image_workflow, server_address, cache_directory, width=portrait_width, height=portrait_height)
+    
+    result = {
+        "files": files,
+        "character": character.to_dict()
+    }
+    
+    return jsonify(result)
 
 class CharacterData:
     def __init__(self, name, portrait, style, lighting, gender, age, ethnicity, description, attitude, pose, environment, attire, sfw=True):
@@ -130,31 +210,56 @@ class CharacterData:
         self.environment = environment
         self.attire = attire
         self.sfw = sfw
+    
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "portrait": self.portrait,
+            "style": self.style,
+            "lighting": self.lighting,
+            "gender": self.gender,
+            "age": self.age,
+            "ethnicity": self.ethnicity,
+            "description": self.description,
+            "attitude": self.attitude,
+            "pose": self.pose,
+            "environment": self.environment,
+            "attire": self.attire,
+            "sfw": self.sfw
+        }
 
-server_address = "127.0.0.1:8188"
-client_id = str(uuid.uuid4())
+
+#client_id = str(uuid.uuid4())
 
 def queue_prompt(prompt):
-    p = {"prompt": prompt, "client_id": client_id}
+    settings = get_settings()
+    server_address = settings.get("comfy_ip")
+    p = {"prompt": prompt, "client_id": session.get('client_id')}
     data = json.dumps(p).encode('utf-8')
     req =  urllib.request.Request("http://{}/prompt".format(server_address), data=data)
     return json.loads(urllib.request.urlopen(req).read())
 
 def get_image(filename, subfolder, folder_type):
+    settings = get_settings()
+    server_address = settings.get("comfy_ip")
     data = {"filename": filename, "subfolder": subfolder, "type": folder_type}
     url_values = urllib.parse.urlencode(data)
     with urllib.request.urlopen("http://{}/view?{}".format(server_address, url_values)) as response:
         return response.read()
 
 def get_history(prompt_id):
+    settings = get_settings()
+    server_address = settings.get("comfy_ip")
     with urllib.request.urlopen("http://{}/history/{}".format(server_address, prompt_id)) as response:
         return json.loads(response.read())
 
-def get_images(ws, prompt):
+async def get_images(ws, prompt):
     prompt_id = queue_prompt(prompt)['prompt_id']
     output_images = {}
+    #print("getting images")
     while True:
         out = ws.recv()
+        #print("received")
         if isinstance(out, str):
             message = json.loads(out)
             if message['type'] == 'executing':
@@ -179,7 +284,7 @@ def get_images(ws, prompt):
 
 def upload_image(input_path, name, server_address, image_type="input", overwrite=False):
     
-  print(f"Path exists? {path.exists(input_path)}")
+  #print(f"Path exists? {path.exists(input_path)}")
   with open(input_path, 'rb') as file:
     multipart_data = MultipartEncoder(
       fields= {
@@ -208,43 +313,49 @@ def save_images(images, folder, filename_root):
                 image_names.append(path.basename(f.name))
     return image_names
 
+import importlib.util
 
-def get_character_photo(character_data, workflow, server_address, output_folder, seed=None):
+async def get_character_photo(character_data, workflow, server_address, output_folder, seed=None, **kwargs):
     then = datetime.now()
-    prompt_text = open(workflow).read()
-    prompt = json.loads(prompt_text)
+    
+    print(f"Loading workflow module: {path.basename(workflow)}")
+    spec = importlib.util.spec_from_file_location("workflow_module", workflow)
+    workflow_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(workflow_module)
+    
+    print(f"Workflow module loaded in {datetime.now() - then}")
     comfy_filename = path.basename(character_data.portrait)
+    
+    print(f"Uploading image: {comfy_filename}")
     upload_image(character_data.portrait, comfy_filename, server_address, "input", True)
     
-    ## specialized to the workflow I've created TODO: generalize this to all other workflows with different node structures
-    prompt["59"]["inputs"]["prompt"] = f"""
-    style={character_data.style},
-    lighting={character_data.lighting},
-    gender={character_data.gender},
-    age={character_data.age}, 
-    ethnicity={character_data.ethnicity},
-    description={character_data.description},
-    attitude={character_data.attitude}, 
-    pose={character_data.pose}, 
-    environment={character_data.environment}, 
-    attire={character_data.attire}
-    """
-    
-    if character_data.sfw:
-        prompt["59"]["inputs"]["prompt"] += ", details=(SFW:1.5)"
-        prompt["57"]["inputs"]["prompt"] += ", details=(Nude:1.5), (NSFW:1.5), sex, nudity"
+    ## TODO: parameterize the width and height of the image from settings
+    w = 768
+    h = 1024
+    if "width" in kwargs:
+        w = kwargs["width"]
+    if "height" in kwargs:
+        h = kwargs["height"]
         
+    print(f"Evaluating workflow for {character_data.name} with width={w}, height={h}")
+    prompt = workflow_module.GetWorkflow(character_data, comfy_filename, width=w, height=h)
     
-    #set the seed for our KSampler node
-    prompt["6"]["inputs"]["seed"] = random.randint(0, 999999999) if seed is None else seed
     
-    prompt["16"]["inputs"]["image"] = comfy_filename
+    print(f"Connecting to Comfy server at {server_address} and client_id={session.get('client_id')}")
     
-    ws = websocket.WebSocket()
-    ws.connect("ws://{}/ws?clientId={}".format(server_address, client_id))
-    images = get_images(ws, prompt)
+    global comfy_ws
+    if comfy_ws is None:
+        comfy_ws = websocket.WebSocket()
+        comfy_ws.connect("ws://{}/ws?clientId={}".format(server_address, session.get('client_id')))
+    
+    print(f"Submitting prompt for {character_data.name}")
+    images = await get_images(comfy_ws, prompt)
     now = datetime.now()
     timestamp_str = now.strftime("%Y%m%d%H%M%S")
+    
+    print(f"Images received in {now - then}s")
+    
+    print(f"Saving {len(images)} images to {output_folder}")
     files = save_images(images, output_folder, character_data.name)
     return files
 

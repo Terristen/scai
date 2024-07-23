@@ -165,6 +165,7 @@ user_content/cache/*
 user_content/cast/*
 user_content/cast_photos/*
 user_content/comfy_workflow/*
+user_content/workflows/*
 
 resources/*
 

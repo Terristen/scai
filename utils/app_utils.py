@@ -1,6 +1,6 @@
 import json
 import logging
-from flask import current_app
+from quart import current_app
 
 is_loaded = False
 

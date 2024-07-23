@@ -1,8 +1,8 @@
-from flask import Blueprint, request, jsonify
+from quart import Blueprint, request, jsonify
 from ollama_client import get_ollama_response, get_ollama_response_single
 from utils.message_utils import create_message, get_message_array, get_system_prompt
 from utils.character_utils import get_character, CharacterSchema, load_characters
-from flask import current_app
+from quart import current_app
 import logging
 
 chat_bp = Blueprint('chat', __name__)
@@ -38,18 +38,21 @@ def build_conversation_prompt(char, conversation, respondents, title="", lore=""
         
     
     
-    conversation_prompt += "\n\n (IMPORTANT: Respond with only {char['name']}'s contribution.)" #TODO: Add a setting for max response length
+    conversation_prompt += f"\n\n (IMPORTANT: Respond with only {char['name']}'s contribution.)\n\n{char['name']}:\n" #TODO: Add a setting for max response length
     return conversation_prompt
 
 
 @chat_bp.route('/get_character_message', methods=['POST'])
-def get_character_message():
+async def get_character_message():
+    data = await request.json
     
-    respondents = request.json.get("respondents", [])
-    conversation = request.json.get("conversation", [])
-    title = request.json.get("title", "")
-    lore = request.json.get("lore", "")
-    setting = request.json.get("setting", "")
+    respondents = data.get("respondents", [])
+    conversation = data.get("conversation", [])
+    title = data.get("title", "")
+    lore = data.get("lore", "")
+    setting = data.get("setting", "")
+    
+    app_settings = current_app.config['SETTINGS']
     
     if len(respondents) == 0:
         return jsonify({"status": "error", "message": "No respondents provided"}), 400
@@ -59,7 +62,7 @@ def get_character_message():
     else:
         settings = get_settings()
         attempts = settings['maximum_turn_taking_attempts']
-        next_character = AITurnPickNextCharacter(respondents, conversation, attempts)
+        next_character = await AITurnPickNextCharacter(respondents, conversation, attempts)
     
     
     char = get_character(respondents, next_character)
@@ -70,13 +73,15 @@ def get_character_message():
     
     conversation_prompt = build_conversation_prompt(char, conversation, respondents, title, lore, setting)
     
-    assistant_message = get_ollama_response_single(char['model'], conversation_prompt)
+    assistant_message = await get_ollama_response_single(char['model'], conversation_prompt, app_settings)
     assistant_message = strip_name_from_message(assistant_message, respondents)
     
     newMessage = create_message(assistant_message, 'assistant', char['name'])
     return jsonify({"assistant_message": newMessage})
 
-def AITurnPickNextCharacter(respondents, chat_messages=[], turn=3, prompt=None):
+async def AITurnPickNextCharacter(respondents, chat_messages=[], turn=3, prompt=None):
+    
+    app_settings = current_app.config['SETTINGS']
     
     characters = [item['name'] for item in respondents]
     turn -= 1
@@ -101,7 +106,7 @@ def AITurnPickNextCharacter(respondents, chat_messages=[], turn=3, prompt=None):
     settings = get_settings()
     charmodel = settings['turn_taking_model']
     
-    proposed_next = get_ollama_response_single(charmodel, conversation_prompt)
+    proposed_next = await get_ollama_response_single(charmodel, conversation_prompt, app_settings)
     
     proposed_next = proposed_next.strip()
     
@@ -116,7 +121,7 @@ def AITurnPickNextCharacter(respondents, chat_messages=[], turn=3, prompt=None):
             print(f"Name in message: {embededName} in turn {turn}")
             return embededName
         else:
-            return AITurnPickNextCharacter(respondents, chat_messages, turn, conversation_prompt)
+            return await AITurnPickNextCharacter(respondents, chat_messages, turn, conversation_prompt)
 
 def NameInMessage(message, respondents):
     names = [item['name'] for item in respondents]
