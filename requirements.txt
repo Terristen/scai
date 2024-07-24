@@ -3,3 +3,6 @@ ollama
 websocket-client
 requests-toolbelt
 aiohttp
+websockets
+asyncio
+aiofiles

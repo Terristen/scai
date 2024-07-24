@@ -1,4 +1,4 @@
-from quart import Blueprint, request, jsonify, current_app, session
+from quart import Quart, Blueprint, request, jsonify, current_app, session
 from utils.app_utils import load_settings, save_settings
 from ollama_client import get_ollama_response_single
 from werkzeug.utils import secure_filename
@@ -15,8 +15,11 @@ from requests_toolbelt import MultipartEncoder
 
 from os import path
 from datetime import datetime
-
+import aiohttp
+import aiofiles
 import asyncio
+import websockets
+
 from concurrent.futures import ThreadPoolExecutor
 
 comfy_bp = Blueprint('comfy', __name__)
@@ -230,88 +233,187 @@ class CharacterData:
 
 
 #client_id = str(uuid.uuid4())
+async def queue_prompt(prompt, server_address, client_id):
+    p = {"prompt": prompt, "client_id": client_id}
+    async with aiohttp.ClientSession() as session:
+        async with session.post(f"http://{server_address}/prompt", json=p) as resp:
+            return await resp.json()
+        
+# def queue_prompt(prompt):
+#     settings = get_settings()
+#     server_address = settings.get("comfy_ip")
+#     p = {"prompt": prompt, "client_id": session.get('client_id')}
+#     data = json.dumps(p).encode('utf-8')
+#     req =  urllib.request.Request("http://{}/prompt".format(server_address), data=data)
+#     return json.loads(urllib.request.urlopen(req).read())
 
-def queue_prompt(prompt):
-    settings = get_settings()
-    server_address = settings.get("comfy_ip")
-    p = {"prompt": prompt, "client_id": session.get('client_id')}
-    data = json.dumps(p).encode('utf-8')
-    req =  urllib.request.Request("http://{}/prompt".format(server_address), data=data)
-    return json.loads(urllib.request.urlopen(req).read())
-
-def get_image(filename, subfolder, folder_type):
-    settings = get_settings()
-    server_address = settings.get("comfy_ip")
+async def get_image(filename, subfolder, folder_type, server_address):
     data = {"filename": filename, "subfolder": subfolder, "type": folder_type}
     url_values = urllib.parse.urlencode(data)
-    with urllib.request.urlopen("http://{}/view?{}".format(server_address, url_values)) as response:
-        return response.read()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"http://{server_address}/view?{url_values}") as resp:
+            return await resp.read()
 
-def get_history(prompt_id):
-    settings = get_settings()
-    server_address = settings.get("comfy_ip")
-    with urllib.request.urlopen("http://{}/history/{}".format(server_address, prompt_id)) as response:
-        return json.loads(response.read())
+# def get_image(filename, subfolder, folder_type):
+#     settings = get_settings()
+#     server_address = settings.get("comfy_ip")
+#     data = {"filename": filename, "subfolder": subfolder, "type": folder_type}
+#     url_values = urllib.parse.urlencode(data)
+#     with urllib.request.urlopen("http://{}/view?{}".format(server_address, url_values)) as response:
+#         return response.read()
 
-async def get_images(ws, prompt):
-    prompt_id = queue_prompt(prompt)['prompt_id']
-    output_images = {}
-    #print("getting images")
+async def get_history(prompt_id, server_address):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"http://{server_address}/history/{prompt_id}") as resp:
+            return await resp.json()
+
+# def get_history(prompt_id):
+#     settings = get_settings()
+#     server_address = settings.get("comfy_ip")
+#     with urllib.request.urlopen("http://{}/history/{}".format(server_address, prompt_id)) as response:
+#         return json.loads(response.read())
+
+async def ping_ws(ws):
     while True:
-        out = ws.recv()
-        #print("received")
+        try:
+            await ws.send(json.dumps({"type": "ping"}))
+            await asyncio.sleep(2)  # Ping every 30 seconds
+        except Exception as e:
+            print(f"Ping failed: {e}")
+            break
+
+async def get_images(ws, prompt, server_address, client_id):
+    prompt_id = (await queue_prompt(prompt, server_address, client_id))['prompt_id']
+    output_images = {}
+    current_node = ""
+
+    while True:
+        try:
+            out = await asyncio.wait_for(ws.recv(), timeout=60)  # Timeout after 30 seconds
+            #print(json.dumps(out))
+        except asyncio.TimeoutError:
+            print("Timeout: No message received from WebSocket within 60 seconds.")
+            break
+
         if isinstance(out, str):
             message = json.loads(out)
             if message['type'] == 'executing':
                 data = message['data']
-                if data['node'] is None and data['prompt_id'] == prompt_id:
-                    break #Execution is done
+                if data['prompt_id'] == prompt_id:
+                    if data['node'] is None:
+                        break  # Execution is done
+                    else:
+                        current_node = data['node']
         else:
-            continue #previews are binary data
+            if current_node == 'save_image_websocket_node':
+                images_output = output_images.get(current_node, [])
+                images_output.append(out[8:])
+                output_images[current_node] = images_output
 
-    history = get_history(prompt_id)[prompt_id]
+    history = (await get_history(prompt_id, server_address))[prompt_id]
     for o in history['outputs']:
         for node_id in history['outputs']:
             node_output = history['outputs'][node_id]
             if 'images' in node_output:
                 images_output = []
                 for image in node_output['images']:
-                    image_data = get_image(image['filename'], image['subfolder'], image['type'])
+                    image_data = await get_image(image['filename'], image['subfolder'], image['type'], server_address)
                     images_output.append(image_data)
-            output_images[node_id] = images_output
+                output_images[node_id] = images_output
 
     return output_images
 
-def upload_image(input_path, name, server_address, image_type="input", overwrite=False):
-    
-  #print(f"Path exists? {path.exists(input_path)}")
-  with open(input_path, 'rb') as file:
-    multipart_data = MultipartEncoder(
-      fields= {
-        'image': (name, file, 'image/png'),
-        'type': image_type,
-        'overwrite': str(overwrite).lower()
-      }
-    )
+# async def get_images(ws, prompt):
+#     prompt_id = queue_prompt(prompt)['prompt_id']
+#     output_images = {}
+#     #print("getting images")
+#     while True:
+#         out = ws.recv()
+#         #print("received")
+#         if isinstance(out, str):
+#             message = json.loads(out)
+#             if message['type'] == 'executing':
+#                 data = message['data']
+#                 if data['node'] is None and data['prompt_id'] == prompt_id:
+#                     break #Execution is done
+#         else:
+#             continue #previews are binary data
 
-    data = multipart_data
-    headers = { 'Content-Type': multipart_data.content_type }
-    request = urllib.request.Request("http://{}/upload/image".format(server_address), data=data, headers=headers)
-    with urllib.request.urlopen(request) as response:
-      return response.read()
+#     history = get_history(prompt_id)[prompt_id]
+#     for o in history['outputs']:
+#         for node_id in history['outputs']:
+#             node_output = history['outputs'][node_id]
+#             if 'images' in node_output:
+#                 images_output = []
+#                 for image in node_output['images']:
+#                     image_data = get_image(image['filename'], image['subfolder'], image['type'])
+#                     images_output.append(image_data)
+#             output_images[node_id] = images_output
 
-def save_images(images, folder, filename_root):
+#     return output_images
+from aiohttp import MultipartWriter
+from aiohttp import FormData
+
+async def upload_image(input_path, name, server_address, image_type="input", overwrite=False):
+    async with aiohttp.ClientSession() as session:
+        form = FormData()
+        form.add_field('image',
+                       open(input_path, 'rb'),
+                       filename=name,
+                       content_type='image/png')
+        form.add_field('type', image_type)
+        form.add_field('overwrite', str(overwrite).lower())
+        
+        async with session.post(f"http://{server_address}/upload/image", data=form) as response:
+            return await response.read()
+        
+# def upload_image(input_path, name, server_address, image_type="input", overwrite=False):
+#   with open(input_path, 'rb') as file:
+#     multipart_data = MultipartEncoder(
+#       fields= {
+#         'image': (name, file, 'image/png'),
+#         'type': image_type,
+#         'overwrite': str(overwrite).lower()
+#       }
+#     )
+
+#     data = multipart_data
+#     headers = { 'Content-Type': multipart_data.content_type }
+#     request = urllib.request.Request("http://{}/upload/image".format(server_address), data=data, headers=headers)
+#     with urllib.request.urlopen(request) as response:
+#       return response.read()
+  
+import os
+
+async def save_images(images, folder, filename_root):
     image_names = []
     imgnum = 0
     now = datetime.now()
     timestamp_str = now.strftime("%Y%m%d%H%M%S")
+
+    os.makedirs(folder, exist_ok=True)  # Ensure the folder exists
+
     for node_id in images:
         for i, image_data in enumerate(images[node_id]):
             imgnum += 1
-            with open("{}/{}_{}_{}.png".format(folder, filename_root, timestamp_str,imgnum), 'wb') as f:
-                f.write(image_data)
-                image_names.append(path.basename(f.name))
+            file_path = os.path.join(folder, f"{filename_root}_{timestamp_str}_{imgnum}.png")
+            async with aiofiles.open(file_path, 'wb') as f:
+                await f.write(image_data)
+                image_names.append(os.path.basename(file_path))
     return image_names
+
+# def save_images(images, folder, filename_root):
+#     image_names = []
+#     imgnum = 0
+#     now = datetime.now()
+#     timestamp_str = now.strftime("%Y%m%d%H%M%S")
+#     for node_id in images:
+#         for i, image_data in enumerate(images[node_id]):
+#             imgnum += 1
+#             with open("{}/{}_{}_{}.png".format(folder, filename_root, timestamp_str,imgnum), 'wb') as f:
+#                 f.write(image_data)
+#                 image_names.append(path.basename(f.name))
+#     return image_names
 
 import importlib.util
 
@@ -327,36 +429,33 @@ async def get_character_photo(character_data, workflow, server_address, output_f
     comfy_filename = path.basename(character_data.portrait)
     
     print(f"Uploading image: {comfy_filename}")
-    upload_image(character_data.portrait, comfy_filename, server_address, "input", True)
+    await upload_image(character_data.portrait, comfy_filename, server_address, "input", True)
     
     ## TODO: parameterize the width and height of the image from settings
-    w = 768
-    h = 1024
-    if "width" in kwargs:
-        w = kwargs["width"]
-    if "height" in kwargs:
-        h = kwargs["height"]
+    w = kwargs.get("width", 768)
+    h = kwargs.get("height", 1024)
+    
         
     print(f"Evaluating workflow for {character_data.name} with width={w}, height={h}")
     prompt = workflow_module.GetWorkflow(character_data, comfy_filename, width=w, height=h)
     
     
     print(f"Connecting to Comfy server at {server_address} and client_id={session.get('client_id')}")
+    ws_url = f"ws://{server_address}/ws?clientId={session.get('client_id')}"
     
-    global comfy_ws
-    if comfy_ws is None:
-        comfy_ws = websocket.WebSocket()
-        comfy_ws.connect("ws://{}/ws?clientId={}".format(server_address, session.get('client_id')))
+    async with websockets.connect(ws_url) as comfy_ws:
+        #ping_task = asyncio.create_task(ping_ws(comfy_ws))
+        print(f"Submitting prompt for {character_data.name}")
+        images = await get_images(comfy_ws, prompt, server_address, session.get('client_id'))
     
-    print(f"Submitting prompt for {character_data.name}")
-    images = await get_images(comfy_ws, prompt)
+    
     now = datetime.now()
     timestamp_str = now.strftime("%Y%m%d%H%M%S")
     
     print(f"Images received in {now - then}s")
     
     print(f"Saving {len(images)} images to {output_folder}")
-    files = save_images(images, output_folder, character_data.name)
+    files = await save_images(images, output_folder, character_data.name)
     return files
 
 
