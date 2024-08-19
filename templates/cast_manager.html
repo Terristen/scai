@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cast Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cast_manager.css') }}">
+    <!-- URL variables from server -->
+    <script type="text/javascript">
+        window.cast_photo_base_url = "{{ cast_photo_base_url }}";
+        window.temp_cache_url = "{{ temp_cache_url }}";
+    </script>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Top Section: Visualize and Collection -->
+        <div class="top-section">
+            <!-- Visualize Section -->
+            <div class="visualizer-container">
+                <div class="image-container">
+                    <img id="visualizer" src="{{ url_for('static', filename='images/default.jpg') }}" alt="Character Image">
+                </div>
+                <button id="visualizeButton" class="btn visualize-btn">Visualize</button>
+    
+                <div class="portrait-container">
+                    <button id="upload-button">Upload Portrait</button>
+                    <img id="portrait-preview" src="{{ url_for('static', filename='images/default.jpg') }}" alt="Portrait Preview">
+                    <input type="file" id="portrait" accept="image/*" style="display:none;">
+                </div>
+    
+                <label for="age-adjustment">Age Adjustment:</label>
+                <input type="range" id="age-adjustment" min="-5" max="5" value="0" step=".1" >
+                <span id="age-value">0</span>
+    
+                <div class="image-size" style="flex:1; flex-direction: row;">
+                    <label for="width">width</label><input type="number" placeholder="Width" id="width" value="768">
+                    <label for="height">height</label><input type="number" placeholder="Height" id="height" value="1280">
+                </div>
+    
+                <textarea id="prompt" placeholder="Describe the character to generate an image..."></textarea>
+                <button id="add-to-collection-button">Add to Collection</button>
+            </div>
+    
+            <!-- Collection Section -->
+            <div class="collection-container" id="collection-container">
+                <!-- Images will be added here dynamically -->
+            </div>
+        </div>
+    
+        <!-- Bottom Section: Character Profile and Loaded Cast -->
+        <div class="bottom-section">
+            <!-- Character Profile Section -->
+            <div class="character-profile">
+                <div class="input-group">
+                    <input type="text" placeholder="Character Name">
+                    <input type="number" placeholder="Age">
+                    <input type="checkbox" id="sfw"><label for="sfw">SFW</label>
+                    <select>
+                        <option disabled selected>Select Ollama Model</option>
+                        <!-- Add models here -->
+                    </select>
+                </div>
+                <textarea placeholder="Enter character description..."></textarea>
+                <textarea placeholder="Instructions for how this character should chat..."></textarea>
+                <textarea placeholder="Define the character's personality traits..."></textarea>
+                <button class="btn add-btn">Add</button>
+            </div>
+    
+            <!-- Loaded Cast Section -->
+            <div class="loaded-cast">
+                <input type="text" placeholder="Cast Title">
+                <textarea placeholder="Enter lore or backstory for the cast..."></textarea>
+                <textarea placeholder="Describe the setting where this cast is placed..."></textarea>
+                <button class="btn load-btn">Load Cast</button>
+                <button class="btn save-btn">Save Cast</button>
+                <div class="cast-list">
+                    <select>
+                        <option disabled selected>Select a character from the cast...</option>
+                        <!-- Add character names here -->
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+
+    <!-- App Scripts -->
+    <script src="{{ url_for('static', filename='js/cast_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cast_manager_bootstrapper.js') }}"></script>
+</body>
+</html>

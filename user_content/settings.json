@@ -1,8 +1,8 @@
 {
     "ollama_url": "http://127.0.0.1:11434",
-    "turn_taking_model": "lumo-turn-taking:latest",
-    "default_actor_model": "lumo-actor:latest",
-    "analyst_model": "lumo-actor:latest",
+    "turn_taking_model": "darkidol-base:latest",
+    "default_actor_model": "lumo-base:latest",
+    "analyst_model": "darkidol-base:latest",
     "maximum_turn_taking_attempts": 4,
     "cast_of_characters_directory": "user_content/cast/",
     "default_cast": "default.json",

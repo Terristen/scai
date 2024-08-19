@@ -20,10 +20,12 @@ def create_app():
     from routes.chat_routes import chat_bp
     from routes.character_routes import character_bp
     from routes.comfy_routes import comfy_bp
+    from routes.cast_manager_routes import cmgr_bp
 
     app.register_blueprint(chat_bp, url_prefix='/chat')
     app.register_blueprint(character_bp, url_prefix='/character')
     app.register_blueprint(comfy_bp, url_prefix='/comfy')
+    app.register_blueprint(cmgr_bp, url_prefix='/cast_manager')
 
     @app.route('/')
     async def home():
@@ -32,6 +34,12 @@ def create_app():
         icon = "character_icon.png"  # Replace with the actual icon name
         return await render_template('chat.html', default_username=SETTINGS.get("username",""), icon=icon, cast_photo_base_url=cast_photo_base_url, temp_cache_url=temp_cache_url)
 
+    @app.route('/cast_manager')
+    async def cast_manager():
+        cast_photo_base_url = url_for('cast_photos', filename='')
+        temp_cache_url = url_for('cache', filename='')
+        return await render_template('cast_manager.html', cast_photo_base_url=cast_photo_base_url, temp_cache_url=temp_cache_url)
+    
     @app.route('/cast_photos/<filename>')
     async def cast_photos(filename):
         return await send_from_directory(cast_photos_directory, filename)
