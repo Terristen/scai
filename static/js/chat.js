@@ -1,11 +1,31 @@
 class Chat {
     constructor() {
+        this.currentCast = {
+            title: "New Cast",
+            lore: "",
+            setting: "",
+            cast: [
+                {
+                    name: "New Character",
+                    age: 0,
+                    description: "",
+                    personality: "",
+                    icon: "/static/images/default.jpg",
+                    model: "",
+                    instructions: "",
+                    sfw: true,
+                    pictures: []
+                }
+            ]
+        };
+
+
         this.initTemplates();
         this.initHelpers();
         this.initVariables();
         this.initialFetches();
     }
-
+ 
     /**
      * Initialize Handlebars templates
      */

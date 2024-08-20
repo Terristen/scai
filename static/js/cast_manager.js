@@ -1,6 +1,23 @@
 class CastManager {
     constructor() {
-        this.currentCast = null; // Store the current cast data
+        this.currentCast = {
+            title: "New Cast",
+            lore: "",
+            setting: "",
+            cast: [
+                {
+                    name: "New Character",
+                    age: 0,
+                    description: "",
+                    personality: "",
+                    icon: "/static/images/default.jpg",
+                    model: "",
+                    instructions: "",
+                    sfw: true,
+                    pictures: []
+                }
+            ]
+        }; // Store the current cast data
         this.currentActorIndex = 0; // Store the current actor index
 
         this.initTemplates();
@@ -268,6 +285,7 @@ class CastManager {
                     //debugger;
                     this.updateUI();
                     this.bindSelectElements();
+                    this.loadCurrentActorImages(); // Update the UI with the current actor's images
                 } catch (error) {
                     console.error("Error parsing cast file:", error);
                 }
@@ -299,9 +317,6 @@ class CastManager {
     }
 
     downloadCastFile() {
-        this.updateActorFields(); // Ensure current actor's data is up to date
-        this.addToPictures(); // Ensure the pictures array is updated
-
         const castData = JSON.stringify(this.currentCast, null, 2); // Pretty print JSON
         const blob = new Blob([castData], { type: 'application/json' });
         const url = URL.createObjectURL(blob);

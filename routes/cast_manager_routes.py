@@ -172,6 +172,13 @@ async def get_photos(workflow, server_address, output_folder, args):
     if(args["portrait"] is not None):
         comfy_filename = path.basename(args["portrait"])
         await upload_image(args["portrait"], comfy_filename, server_address, "input", True)
+        
+        try:
+            os.remove(args["portrait"])
+            print(f"Deleted {args['portrait']} from the server.")
+        except OSError as e:
+            print(f"Error: {args['portrait']} : {e.strerror}")
+            
     
     w = args.get("width", 768)
     h = args.get("height", 1024)
