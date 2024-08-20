@@ -1,3 +1,5 @@
+/* General Styles */
+
 * {
     box-sizing: border-box;
 }
@@ -7,33 +9,59 @@ body {
     font-family: Arial, sans-serif;
     background-color: #2d2f36;
     color: #fff;
-    height: 100vh; /* Ensure full screen height */
+    height: 100vh; /* Full screen height */
 }
 
+
+
+
+/* Main Container Layout */
 .main-container {
     display: flex;
     flex-direction: column;
     height: 100%; /* Full height of the screen */
-    gap: 20px;
+    /* gap: 20px; */
 }
 
-.top-section, .bottom-section {
+.top-section {
     display: flex;
-    flex: 1; /* Each section takes up half of the screen height */
+    flex: 1; /* Takes up two-thirds of the screen height */
+    /* gap: 20px; */
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 20px;
+    flex-direction: column;
+}
+
+.bottom-section {
+    display: flex;
+    flex: 1; /* Takes up one-third of the screen height */
     gap: 20px;
     flex-direction: row;
-    max-height: 50%;
+    padding: 20px;
+}
+
+
+
+/* Visualizer and Collection Styles */
+.visualizer-and-collection {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    width: 100%;
+    max-height: 450px; /* Set a specific max-height */
+    position: relative;
 }
 
 .visualizer-container {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    flex: 1; /* Takes the necessary width within the top-section */
-    gap: 10px;
 }
 
 .image-container {
+    position: relative;
     width: 100%;
     aspect-ratio: 1;
     background-color: #4a4d55;
@@ -41,6 +69,8 @@ body {
     justify-content: center;
     align-items: center;
     overflow: hidden;
+    padding: 15px;
+    border-radius: 10px;
 }
 
 .image-container img {
@@ -49,23 +79,76 @@ body {
     object-fit: cover;
 }
 
-.collection-container {
-    flex: 2; /* Takes the remaining width in the top-section */
+.portrait-container {
+    position: relative;
     display: flex;
+    flex-direction: column;
+    width: 152px;
+    height: 256px;
+}
+
+.portrait-container.trash-icon {
+    position: relative;
+    top: 5px;
+    right: 5px;
+
+}
+
+#portrait-preview {
+    max-width: 400px;
+    max-height: 216px;
+    object-fit: cover;
+    border-radius: 5px;
+}
+
+#upload-button {
+    padding: 5px 10px;
+    background-color: #5a5e69;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 152px;
+}
+
+#upload-button:hover {
+    background-color: #6b6f79;
+}
+
+.collection-container {
+    flex: 3;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
     overflow-x: auto;
-    gap: 10px;
+    overflow-y: hidden;
     background-color: #3c3f48;
     padding: 10px;
     border-radius: 10px;
-    flex-direction: row;
+    max-height: 100%; /* Inherits max-height from visualizer-and-collection */
+    transition: background-color 0.2s ease-in-out;
+}
+
+.collection-container.drag-over {
+    background-color: #4a4d55; /* Change background color when an item is dragged over */
 }
 
 .collection-container img {
-    height: 100px;
-    object-fit: fill;
+    max-height: 100%; /* Constrain images to the height of their parent container */
+    object-fit: contain;
     border-radius: 5px;
+    margin-right: 10px;
     position: relative;
 }
+
+.collection-item {
+    height: -webkit-fill-available;
+    position: relative;
+} 
+
+/* .collection-container img:first-child {
+    margin-left: 0;
+} */
 
 .trash-icon {
     position: absolute;
@@ -76,8 +159,6 @@ body {
     padding: 5px;
     cursor: pointer;
     color: white;
-    width: 25px;
-    height: 25px;
 }
 
 .fullscreen-overlay {
@@ -99,56 +180,66 @@ body {
     object-fit: cover;
 }
 
-#add-to-collection-button {
-    padding: 8px 16px;
-    background-color: #5a5e69;
+
+/* Controls Styles */
+.controls-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 100%;
+    margin-top: 20px;
+}
+
+.slider-group, .size-group, .sampler-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 1;
+}
+
+.slider-group label, .size-group label {
+    margin-right: 5px;
+}
+
+#age-adjustment {
+    flex: 1;
+}
+
+.size-group input[type="number"] {
+    width: 60px;
+    padding: 5px;
+    background-color: #6c7079;
+    border: none;
+    color: white;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.sampler-group input[type="number"] {
+    width: 60px;
+    padding: 5px;
+    background-color: #6c7079;
+    border: none;
+    color: white;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.sampler-group #seed {
+    flex-grow: 1;
+}
+
+textarea#prompt {
+    flex: 2;
+    height: 40px; /* Two lines height */
+    resize: none;
+    padding: 10px;
+    box-sizing: border-box;
+    border-radius: 5px;
+    background-color: #6c7079;
     color: white;
     border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-#add-to-collection-button:hover {
-    background-color: #6b6f79;
-}
-
-/* Character Profile Section */
-.character-profile {
-    background-color: #3c3f48;
-    padding: 15px;
-    border-radius: 10px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.input-group {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-}
-
-.input-group input[type="text"], .input-group input[type="number"], .input-group select {
-    background-color: #6c7079;
-    border: none;
-    padding: 10px;
-    color: #fff;
-    border-radius: 5px;
-    flex: 1;
-}
-
-.image-size input[type="number"] {
-    width: 100px;
-}
-
-textarea, input[type="text"], input[type="number"], select {
-    background-color: #6c7079;
-    border: none;
-    padding: 10px;
-    color: #fff;
-    border-radius: 5px;
-    width: 100%;
 }
 
 .btn {
@@ -163,7 +254,31 @@ textarea, input[type="text"], input[type="number"], select {
     background-color: #6b6f79;
 }
 
-/* Loaded Cast Section */
+#visualizeButton, #add-to-collection-button {
+    padding: 10px;
+    background-color: #5a5e69;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#visualizeButton:hover, #add-to-collection-button:hover {
+    background-color: #6b6f79;
+}
+
+
+/* Character Profile Styles */
+.character-profile {
+    background-color: #3c3f48;
+    padding: 15px;
+    border-radius: 10px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 .loaded-cast {
     background-color: #3c3f48;
     padding: 15px;
@@ -172,6 +287,33 @@ textarea, input[type="text"], input[type="number"], select {
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+.input-group {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    /* flex: 1; */
+    align-items: center;
+}
+
+.input-group input[type="text"], .input-group input[type="number"], .input-group select,
+textarea, input[type="text"], input[type="number"], select {
+    background-color: #6c7079;
+    border: none;
+    padding: 10px;
+    color: #fff;
+    border-radius: 5px;
+    width: 100%;
+}
+
+.image-size input[type="number"] {
+    width: 100px;
+}
+
+textarea {
+    resize: none;
+    box-sizing: border-box;
 }
 
 .cast-list select {
@@ -183,6 +325,8 @@ textarea, input[type="text"], input[type="number"], select {
     width: 100%;
 }
 
+
+/* Placeholder Styles */
 ::placeholder {
     color: #e0e0e0; /* Light gray color for better visibility */
     opacity: 1; /* Ensure full opacity for the placeholder text */
@@ -197,28 +341,27 @@ textarea, input[type="text"], input[type="number"], select {
     color: #e0e0e0;
 }
 
-.portrait-container {
+
+
+/* Additional Utility Styles */
+.generation-group {
+    background-color: #3c3f48;
+    padding: 15px;
+    border-radius: 10px;
+    flex: 1;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 10px;
+    max-width: 25%;
 }
 
-#upload-button {
-    padding: 8px 16px;
-    background-color: #5a5e69;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-#upload-button:hover {
-    background-color: #6b6f79;
-}
-
-#portrait-preview {
-    width: 50px;
-    height: 50px;
-    object-fit: cover;
-    border-radius: 5px;
+.character-settings-group {
+    background-color: #3c3f48;
+    padding: 15px;
+    border-radius: 10px;
+    /* flex: 1; */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
 }

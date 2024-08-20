@@ -1,3 +1,3 @@
 document.addEventListener('DOMContentLoaded', function () {
-    window.chatInstance = new CastManager();
+    window.managerInstance = new CastManager();
 });

@@ -27,8 +27,13 @@ from concurrent.futures import ThreadPoolExecutor
 import importlib.util
 import os
 
+from io import BytesIO
+from PIL import Image
+
 from aiohttp import MultipartWriter
 from aiohttp import FormData
+
+import requests
 
 cmgr_bp = Blueprint('cmgr', __name__)
 
@@ -50,7 +55,37 @@ async def ensure_client_id():
     if 'client_id' not in session:
         session['client_id'] = generate_client_id()
 
-   
+@cmgr_bp.route('/ollama_models', methods=['GET'])
+def get_ollama_models(api_base_url=None):
+    if api_base_url is None:
+        api_base_url = get_settings().get("ollama_url")
+        
+    # Define the API endpoint
+    endpoint = f"{api_base_url}/api/tags"
+    
+    print(f"ollama endpoint: ", endpoint)
+    
+    try:
+        # Make the GET request
+        response = requests.get(endpoint)
+        print(f"response: ", response)
+        # Check if the request was successful
+        if response.status_code == 200:
+            # Parse the JSON response
+            models = response.json()
+            return models
+        else:
+            print(f"Failed to retrieve models. Status code: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+# # Example usage
+# api_base_url = "https://api.ollama.com"  # Replace with the actual base URL of the Ollama API
+# models = get_ollama_models(api_base_url)
+# if models:
+#     print("Available models:", models)
 
 def handle_file_upload(file, cache_directory):
     if file:
@@ -76,7 +111,7 @@ async def generate():
     
     data = await request.json
     files = await request.files
-    
+    #print(data)
     args = {}
     
     if "portrait" in data and data["portrait"]:
@@ -92,15 +127,20 @@ async def generate():
     args["width"] = data.get("portrait_width", default_photo_width)
     args["height"] = data.get("portrait_height", default_photo_height)
     
+    args["cfg"] = data.get("cfg", 3)
+    args["steps"] = data.get("steps", 20)
+    args["seed"] = data.get("seed")
+    
     #print(args)
     
-    images = await get_photos(image_workflow, server_address, cache_directory, args)
+    images_pkg = await get_photos(image_workflow, server_address, cache_directory, args)
     
-    result = {
-        "files": images
-    }
+    # images_pkg = {
+    #     "images": [images_encoded],  # List of base64-encoded images
+    #     "seed": seed used to generate the images
+    # }
     
-    return jsonify(result)
+    return jsonify(images_pkg)
 
 def save_base64_image(base64_string, cache_directory):
     # Decode the base64 string
@@ -139,8 +179,12 @@ async def get_photos(workflow, server_address, output_folder, args):
     sfw = args.get("sfw", False)
     prompt = args.get("prompt", "a person")
     age_adjust = args.get("age_adjust", 0)
-        
-    prompt = workflow_module.GetWorkflow(comfy_filename, width=w, height=h, sfw=sfw, prompt=prompt, age_adjust=age_adjust)
+    cfg = args.get("cfg", 3)
+    steps = args.get("steps", 20)
+    seed = args.get("seed")
+    
+    #print("age_adjust: ", age_adjust)    
+    prompt, calculatedSeed = workflow_module.GetWorkflow(comfy_filename, width=w, height=h, sfw=sfw, prompt=prompt, age_adjust=age_adjust, cfg=cfg, steps=steps, seed=seed)
     
     
     print(f"Connecting to Comfy server at {server_address} and client_id={session.get('client_id')}")
@@ -155,8 +199,12 @@ async def get_photos(workflow, server_address, output_folder, args):
     print(f"Images received in {now - then}s")
     
     print(f"Saving {len(images)} images to {output_folder}")
-    files = await save_images(images, output_folder, "portrait_" + then.strftime("%Y%m%d%H%M%S"))
-    return files
+    images = await encode_images(images)
+    #files = await save_images(images, output_folder, "portrait_" + then.strftime("%Y%m%d%H%M%S"))
+    
+    
+    
+    return {"seed": calculatedSeed, "images": images}
 
 
 
@@ -252,7 +300,14 @@ async def upload_image(input_path, name, server_address, image_type="input", ove
             return await response.read()
         
 
-  
+async def encode_images(images):
+    encoded_images = []
+    
+    for node_id in images:
+        for i, image_data in enumerate(images[node_id]):
+            encoded_images.append(base64.b64encode(image_data).decode('utf-8'))
+                
+    return encoded_images
 
 
 async def save_images(images, folder, filename_root):

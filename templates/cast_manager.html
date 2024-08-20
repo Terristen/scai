@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cast Manager</title>
+    
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+    
+    <!-- <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script> -->
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/cast_manager.css') }}">
     <!-- URL variables from server -->
     <script type="text/javascript">
@@ -12,74 +20,126 @@
     </script>
 </head>
 <body>
-    <div class="main-container">
+    <div class="main-container" x-data="castManager()">
         <!-- Top Section: Visualize and Collection -->
         <div class="top-section">
-            <!-- Visualize Section -->
-            <div class="visualizer-container">
-                <div class="image-container">
-                    <img id="visualizer" src="{{ url_for('static', filename='images/default.jpg') }}" alt="Character Image">
+            <!-- Visualize and Collection Row -->
+            <div class="visualizer-and-collection">
+                <!-- Visualize Section -->
+                <div class="visualizer-container">
+                    <div class="image-container">
+                        <img id="visualizer" src="{{ url_for('static', filename='images/default.jpg') }}" alt="Character Image">
+                    </div>
                 </div>
-                <button id="visualizeButton" class="btn visualize-btn">Visualize</button>
-    
-                <div class="portrait-container">
-                    <button id="upload-button">Upload Portrait</button>
-                    <img id="portrait-preview" src="{{ url_for('static', filename='images/default.jpg') }}" alt="Portrait Preview">
-                    <input type="file" id="portrait" accept="image/*" style="display:none;">
+        
+                <!-- Collection Section -->
+                <div class="collection-container" id="collection-container">
+                    <!-- Images will be added here dynamically -->
                 </div>
-    
-                <label for="age-adjustment">Age Adjustment:</label>
-                <input type="range" id="age-adjustment" min="-5" max="5" value="0" step=".1" >
-                <span id="age-value">0</span>
-    
-                <div class="image-size" style="flex:1; flex-direction: row;">
-                    <label for="width">width</label><input type="number" placeholder="Width" id="width" value="768">
-                    <label for="height">height</label><input type="number" placeholder="Height" id="height" value="1280">
-                </div>
-    
-                <textarea id="prompt" placeholder="Describe the character to generate an image..."></textarea>
-                <button id="add-to-collection-button">Add to Collection</button>
             </div>
-    
-            <!-- Collection Section -->
-            <div class="collection-container" id="collection-container">
-                <!-- Images will be added here dynamically -->
+        
+            <!-- Controls Row -->
+            <div class="controls-row">
+                <div class="generation-group">
+                    <textarea id="prompt" placeholder="Describe the character to generate an image..."></textarea>
+            
+                    <div class="slider-group">
+                        <label for="age-adjustment">Adjust Age:</label>
+                        <input type="range" id="age-adjustment" min="-5" max="5" value="0" step=".1">
+                        <span id="age-value">0</span>
+                    </div>
+                    
+                    <div class="size-group">
+                        <label for="width">Width</label>
+                        <input type="number" id="width" value="768">
+                        <label for="height">Height</label>
+                        <input type="number" id="height" value="1280">
+                        <label for="aspect-ratio">Aspect Ratio</label>
+                        <select id="aspect-ratio">
+                            <option value="">Select Ratio</option>
+                            <!-- Options will be added here dynamically -->
+                        </select>
+                    </div>
+
+                    <div class="sampler-group">
+                        <label for="cfg">cfg</label>
+                        <input type="number" id="cfg" value="3">
+                        <label for="steps">steps</label>
+                        <input type="number" id="steps" value="20">
+                        <label for="seed">seed</label>
+                        <input type="number" id="seed" value="-1">
+                        <img id="last-seed" src="{{ url_for('static', filename='images/seed.png') }}" alt="-1" style="width:25px;height:25px;cursor:hand;">
+                    </div>
+            
+                    <button id="visualizeButton" class="btn visualize-btn">Visualize</button>
+                    <!-- <button id="add-to-collection-button" class="btn add-to-collection-btn">Add to Collection</button> -->
+                </div>
+                <div class="character-settings-group">
+                    <div class="portrait-container">
+                        <div class="trash-icon" id="portrait-clear-button">×</div>
+                        <img id="portrait-preview" src="{{ url_for('static', filename='images/default.jpg') }}" alt="Portrait Preview">
+                        <button id="upload-button">Upload<br />Portrait</button>
+                        <input type="file" id="portrait" accept="image/*" style="display:none;">
+                    </div>
+                </div>
+
+                <!-- Character Profile Section -->
+                <div class="character-profile">
+                    <div class="input-group">
+                        <input id="actor-name" type="text" placeholder="Character Name">
+                        <input id="actor-age" type="number" placeholder="Age">
+                        <input type="checkbox" id="actor-sfw"><label for="actor-sfw">SFW</label>
+                        <select id="actor-model">
+                            <option disabled selected>Select Ollama Model</option>
+                            <!-- Add models here -->
+                        </select>
+                    </div>
+                    <div style="display:flex; flex-direction:row;flex: 1; gap: 10px;">
+                        <div style="display:flex; flex-direction:column;flex: 1; gap: 10px;">
+                            <textarea id="actor-description" placeholder="Enter character description..." style="flex: 1;"></textarea>
+                            <textarea id="actor-instructions" placeholder="Instructions for how this character should chat..." style="flex: 1;"></textarea>
+                        </div>
+                        <div style="display:flex; flex: 1; gap: 10px;">
+                            <textarea id="actor-personality" placeholder="Define the character's personality traits..."></textarea>
+                        </div>
+                    </div>
+                        
+                    
+                    
+                </div>
             </div>
+
+            
         </div>
+        
     
         <!-- Bottom Section: Character Profile and Loaded Cast -->
         <div class="bottom-section">
-            <!-- Character Profile Section -->
-            <div class="character-profile">
-                <div class="input-group">
-                    <input type="text" placeholder="Character Name">
-                    <input type="number" placeholder="Age">
-                    <input type="checkbox" id="sfw"><label for="sfw">SFW</label>
-                    <select>
-                        <option disabled selected>Select Ollama Model</option>
-                        <!-- Add models here -->
-                    </select>
-                </div>
-                <textarea placeholder="Enter character description..."></textarea>
-                <textarea placeholder="Instructions for how this character should chat..."></textarea>
-                <textarea placeholder="Define the character's personality traits..."></textarea>
-                <button class="btn add-btn">Add</button>
-            </div>
-    
             <!-- Loaded Cast Section -->
             <div class="loaded-cast">
-                <input type="text" placeholder="Cast Title">
-                <textarea placeholder="Enter lore or backstory for the cast..."></textarea>
-                <textarea placeholder="Describe the setting where this cast is placed..."></textarea>
-                <button class="btn load-btn">Load Cast</button>
-                <button class="btn save-btn">Save Cast</button>
-                <div class="cast-list">
-                    <select>
+                <div style="display:flex; flex-direction:row; gap: 10px;">
+                    <button id="load-cast-button" class="btn load-btn">Load Cast</button>
+                    <input type="file" id="cast-upload" accept="application/json" style="display:none;">
+                    <input id="cast-title" type="text" placeholder="Cast Title" style="flex:2;">
+                    <select id="cast-list" style="flex:1;">
                         <option disabled selected>Select a character from the cast...</option>
-                        <!-- Add character names here -->
                     </select>
+                    <button id="download-cast" class="btn save-btn">Save Cast</button>
+                </div>
+                
+                <div style="display:flex; flex-direction:column;flex: 1; gap: 10px;">
+                    <textarea id="cast-lore" placeholder="Enter lore or backstory for the cast..." style="flex: 1;"></textarea>
+                    <textarea id="cast-setting" placeholder="Describe the setting where this cast is placed..." style="flex: 1;"></textarea>
                 </div>
             </div>
+            <!--
+            <div class="cast-list">
+                <select id="cast-list">
+                    <option disabled selected>Select a character from the cast...</option>
+                </select>
+            </div>
+            -->
+
         </div>
     </div>
     
