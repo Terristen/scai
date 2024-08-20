@@ -1,14 +1,142 @@
 class CastManager {
     constructor() {
         this.currentCast = null; // Store the current cast data
-        this.currentActor = null; // Store the current actor data
+        this.currentActorIndex = 0; // Store the current actor index
 
         this.initTemplates();
         this.initHelpers();
         this.initVariables();
         this.initialFetches();
         this.attachEventListeners(); // Attach event listeners for buttons and other elements
+        this.initBindings(); // Initialize data bindings
+    }
 
+    get currentActor() {
+        if(this.currentCast && this.currentCast.cast.length > 0){
+            this.currentActorIndex = Math.min(this.currentActorIndex, this.currentCast.cast.length - 1); 
+            return this.currentCast.cast[this.currentActorIndex];
+        }
+        return null;
+    }
+
+    // Method to initialize bindings
+    initBindings() {
+        // Query all elements with the data-bind attribute
+        const bindableElements = document.querySelectorAll('[data-bind]');
+
+        // Attach change listeners to each element
+        bindableElements.forEach(element => {
+            const bindPath = element.getAttribute('data-bind');
+            element.addEventListener('input', (event) => this.updateModel(event, bindPath));
+        });
+
+        // Initialize the UI with the current data
+        this.updateUI();
+    }
+
+    // Method to bind select elements based on custom attributes
+    bindSelectElements() {
+        const selectElements = document.querySelectorAll('select[array-bind]');
+
+        selectElements.forEach(element => {
+            const arrayBind = element.getAttribute('array-bind');
+            const valueField = element.getAttribute('value') || 'index'; // Default to using index
+            const displayField = element.getAttribute('display');
+
+            this.populateSelect(element, arrayBind, valueField, displayField);
+
+            // Handle change event to update current actor index
+            element.addEventListener('change', (e) => {
+                this.currentActorIndex = parseInt(e.target.value, 10);
+                this.updateUI();
+                this.loadCurrentActorImages();
+            });
+        });
+    }
+
+    // Method to populate a select element
+    populateSelect(element, arrayBind, valueField, displayField) {
+        const [object, field] = arrayBind.split('.');
+        let reference = null;
+        if(object === 'cast') {
+            reference = this.currentCast;
+        } else if (object === 'actor') {
+            reference = this.currentActor;
+        }
+        
+        if (!reference || !reference[field]) {
+            return;
+        }
+
+        const dataArray = reference[field];
+
+        
+        // Clear existing options
+        element.innerHTML = '<option disabled selected>Select a character from the cast...</option>';
+
+        // Populate the select options
+        dataArray.forEach((item, index) => {
+            const option = document.createElement('option');
+            option.value = valueField === 'index' ? index : item[valueField];
+            option.textContent = item[displayField];
+            if (index === this.currentActorIndex) {
+                option.selected = true;
+            }
+            element.appendChild(option);
+        });
+    }
+
+    updateModel(event, bindPath) {
+        const [object, property] = bindPath.split('.');
+
+        if (object === 'cast') {
+            if (event.target.type === 'checkbox') {
+                this.currentCast[property] = event.target.checked;
+            } else {
+                this.currentCast[property] = event.target.value;
+            }
+        } else if (object === 'actor') {
+            const currentActor = this.currentActor;
+            if (event.target.type === 'checkbox') {
+                currentActor[property] = event.target.checked;
+            } else {
+                currentActor[property] = event.target.value;
+            }
+        }
+    }
+
+    updateCollectionFromPictures() {
+        const currentActor = this.currentActor;
+        if (currentActor) {
+            const collectionContainer = document.getElementById('collection-container');
+            const images = Array.from(collectionContainer.querySelectorAll('img')).map(img => img.src);
+            currentActor.pictures = images;
+        }
+    }
+
+    updateUI() {
+        // Set the initial values of the inputs from the model
+        const bindableElements = document.querySelectorAll('[data-bind]');
+
+        bindableElements.forEach(element => {
+            const bindPath = element.getAttribute('data-bind');
+            const [object, property] = bindPath.split('.');
+
+            if (object === 'cast' && this.currentCast) {
+                if (element.type === 'checkbox') {
+                    element.checked = this.currentCast[property] || false;
+                } else {
+                    element.value = this.currentCast[property] || '';
+                }
+            } else if (object === 'actor' && this.currentActor) {
+                const ca = this.currentActor;
+                if (element.type === 'checkbox') {
+                    element.checked = ca[property] || false;
+                } else {
+                    element.value = ca[property] || '';
+                }
+            }
+        });
     }
 
     /**
@@ -77,12 +205,15 @@ class CastManager {
                 
                 // Clear any previously dragged image data
                 document.getElementById('portrait').value = ''; // Reset the file input field
+
+                this.updateCurrentActorPictures(); // Update the current actor's icon immediately
             }
         });
 
         
         document.getElementById('portrait-clear-button').addEventListener('click', () => {
             this.clearPortraitValue();
+            this.updateCurrentActorPictures();
         });
 
         document.getElementById("last-seed").addEventListener('click', () => {
@@ -104,6 +235,11 @@ class CastManager {
             document.getElementById('cast-upload').click();
         });
 
+        document.getElementById('cast-list').addEventListener('change', (e) => {
+            this.currentActorIndex = parseInt(e.target.value, 10);
+            this.updateUI(); // This will also load images and update the form field
+        });
+
     }
 
     populateActorModelList(){
@@ -116,6 +252,8 @@ class CastManager {
         }
     }
 
+
+    //loads a cast file into the manager
     async loadCastFile(event) {
         const file = event.target.files[0];
         if (file) {
@@ -123,82 +261,40 @@ class CastManager {
             reader.onload = (e) => {
                 try {
                     this.currentCast = JSON.parse(e.target.result);
-                    this.bindCastFields();
-                    this.selectActor(0); // Automatically select the first actor
+                    this.currentActorIndex = 0; // Reset the actor index
+
+                    //this.bindCastFields();
+                    //this.selectActor(0); // Automatically select the first actor
+                    //debugger;
+                    this.updateUI();
+                    this.bindSelectElements();
                 } catch (error) {
                     console.error("Error parsing cast file:", error);
                 }
             };
             reader.readAsText(file);
-        }
-    }
 
-    bindCastFields() {
-        if (this.currentCast) {
-            document.getElementById('cast-title').value = this.currentCast.title || '';
-            document.getElementById('cast-lore').value = this.currentCast.lore || '';
-            document.getElementById('cast-setting').value = this.currentCast.setting || '';
-            this.populateCastList();
-        }
-    }
-
-    populateCastList() {
-        const castList = document.getElementById('cast-list');
-        castList.innerHTML = ''; // Clear the list
-
-        this.currentCast.cast.forEach((actor, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = actor.name;
-            castList.appendChild(option);
-        });
-
-        castList.addEventListener('change', (e) => this.selectActor(e.target.value));
-    }
-
-    selectActor(index) {
-        this.currentActor = this.currentCast.cast[index];
-        this.bindActorFields();
-    }
-
-    bindActorFields() {
-        if (this.currentActor) {
-            document.getElementById('actor-name').value = this.currentActor.name || '';
-            document.getElementById('actor-age').value = this.currentActor.age || '';
-            document.getElementById('actor-description').value = this.currentActor.description || '';
-            document.getElementById('actor-personality').value = this.currentActor.personality || '';
-            document.getElementById('actor-instructions').value = this.currentActor.instructions || '';
-            document.getElementById('actor-model').value = this.currentActor.model || '';
-            document.getElementById('actor-sfw').checked = this.currentActor.sfw || false;
             
-            //this might need to have conditional logic to check if the icon is a base64 string or a path
-            document.getElementById('portrait-preview').src = this.currentActor.icon ? `/static/images/${this.currentActor.icon}` : this.default_image;
         }
     }
 
-    updateActorFields() {
-        if (this.currentActor) {
-            this.currentActor.name = document.getElementById('actor-name').value;
-            this.currentActor.age = document.getElementById('actor-age').value;
-            this.currentActor.description = document.getElementById('actor-description').value;
-            this.currentActor.personality = document.getElementById('actor-personality').value;
-            this.currentActor.instructions = document.getElementById('actor-instructions').value;
-            this.currentActor.model = document.getElementById('actor-model').value;
-            this.currentActor.sfw = document.getElementById('actor-sfw').checked;
-        }
-    }
+    
 
+    //update the pictures array from the collection container
     addToPictures() {
-        if (this.currentActor) {
+        const currentActor = this.currentActor
+        if (currentActor) {
             const collectionContainer = document.getElementById('collection-container');
             const images = Array.from(collectionContainer.querySelectorAll('img')).map(img => img.src);
             this.currentActor.pictures = images;
         }
     }
 
+    //update the icon field from the portrait preview
     updatePortraitBase64(base64) {
-        if (this.currentActor) {
-            this.currentActor.icon = base64; // Set the base64 encoded data as the icon
+        const currentActor = this.currentActor
+        if (currentActor) {
+            currentActor.icon = base64; // Set the base64 encoded data as the icon
         }
     }
 
@@ -442,6 +538,7 @@ class CastManager {
             const imageSrc = e.dataTransfer.getData('text/plain');
             if (imageSrc) {
                 this.addToCollection(imageSrc);
+                this.updateCurrentActorPictures(); // Immediately update the actor's data
             }
         });
         
@@ -460,9 +557,14 @@ class CastManager {
                 const base64String = await this.convertFileToBase64(file);
                 portraitPreview.src = base64String; // Update the preview image
                 portraitInput.dataset.base64 = base64String; // Store the Base64 string in a data attribute for form submission
-                
+
                 // Clear any previously uploaded file data
                 portraitInput.value = ''; // Reset the file input field
+
+                const currentActor = this.currentActor;
+                currentActor.icon = base64String
+                this.loadCurrentActorImages(); // Update the UI
+                this.updateCurrentActorPictures(); // Immediately update the actor's data
             } catch (error) {
                 console.error('Error during drag-and-drop:', error);
             }
@@ -497,6 +599,7 @@ class CastManager {
     
         trashIcon.addEventListener('click', () => {
             imageElement.remove();
+            this.updateCurrentActorPictures(); // Update the pictures array immediately
         });
     
         img.addEventListener('click', () => {
@@ -521,5 +624,87 @@ class CastManager {
             return
         }
     }
+
+    loadCurrentActorImages() {
+        const portraitPreview = document.getElementById('portrait-preview');
+        const visualizer = document.getElementById('visualizer');
+        const portraitInput = document.getElementById('portrait');
+        const currentActor = this.currentActor;
+    
+        //console.log("Loading current actor images", currentActor);
+    
+        const icon = currentActor.icon || '/static/images/default.jpg';
+        portraitPreview.src = icon;
+        visualizer.src = icon;
+    
+        // Debug: Check what is being set in portrait preview and visualizer
+        //console.log("Icon set to:", icon);
+    
+        // If the icon is a base64 string, update the portrait input field
+        if (icon.startsWith('data:image/')) {
+            portraitInput.dataset.base64 = icon;
+            //console.log("Setting base64 in portrait input dataset");
+        } else {
+            portraitInput.value = '';
+            //console.log("Clearing portrait input value");
+        }
+    
+        // Clear the current collection container
+        const collectionContainer = document.getElementById('collection-container');
+        collectionContainer.innerHTML = '';
+    
+        if (!currentActor.pictures) {
+            currentActor.pictures = [];
+        }
+    
+        // Load pictures into the collection container
+        currentActor.pictures.forEach((picture, index) => {
+            const imageElement = document.createElement('div');
+            imageElement.classList.add('collection-item');
+            imageElement.style.position = "relative";
+    
+            const img = document.createElement('img');
+            img.src = picture;
+    
+            const trashIcon = document.createElement('div');
+            trashIcon.classList.add('trash-icon');
+            trashIcon.innerHTML = '&times;';
+    
+            trashIcon.addEventListener('click', () => {
+                currentActor.pictures.splice(index, 1); // Remove image from array
+                this.loadCurrentActorImages(); // Refresh the collection
+                this.updateCurrentActorPictures(); // Update pictures immediately
+            });
+    
+            img.addEventListener('click', () => {
+                this.showFullscreenImage(img.src);
+            });
+    
+            imageElement.appendChild(img);
+            imageElement.appendChild(trashIcon);
+            collectionContainer.appendChild(imageElement);
+        });
+    
+        //console.log("Loaded images into collection:", currentActor.pictures);
+    }
+    
+
+    updateCurrentActorPictures() {
+        const portraitPreview = document.getElementById('portrait-preview');
+        const collectionContainer = document.getElementById('collection-container');
+        const currentActor = this.currentActor;
+    
+        // Update the portrait as the icon
+        currentActor.icon = portraitPreview.src;
+        //console.log("Updated icon to:", currentActor.icon);
+    
+        // Update all images in the collection container to the pictures array
+        currentActor.pictures = Array.from(collectionContainer.querySelectorAll('img')).map(img => img.src);
+    
+        //console.log("Updated pictures array:", currentActor.pictures);
+    }
+    
+
+    
 
 }

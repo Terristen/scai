@@ -86,21 +86,21 @@
                 <!-- Character Profile Section -->
                 <div class="character-profile">
                     <div class="input-group">
-                        <input id="actor-name" type="text" placeholder="Character Name">
-                        <input id="actor-age" type="number" placeholder="Age">
-                        <input type="checkbox" id="actor-sfw"><label for="actor-sfw">SFW</label>
-                        <select id="actor-model">
+                        <input id="actor-name" type="text" placeholder="Character Name" data-bind="actor.name">
+                        <input id="actor-age" type="number" placeholder="Age" data-bind="actor.age">
+                        <input type="checkbox" id="actor-sfw" data-bind="actor.sfw"><label for="actor-sfw">SFW</label>
+                        <select id="actor-model" data-bind="actor.model">
                             <option disabled selected>Select Ollama Model</option>
                             <!-- Add models here -->
                         </select>
                     </div>
                     <div style="display:flex; flex-direction:row;flex: 1; gap: 10px;">
                         <div style="display:flex; flex-direction:column;flex: 1; gap: 10px;">
-                            <textarea id="actor-description" placeholder="Enter character description..." style="flex: 1;"></textarea>
-                            <textarea id="actor-instructions" placeholder="Instructions for how this character should chat..." style="flex: 1;"></textarea>
+                            <textarea id="actor-description" placeholder="Enter character description..." style="flex: 1;" data-bind="actor.description"></textarea>
+                            <textarea id="actor-instructions" placeholder="Instructions for how this character should chat..." style="flex: 1;" data-bind="actor.instructions"></textarea>
                         </div>
                         <div style="display:flex; flex: 1; gap: 10px;">
-                            <textarea id="actor-personality" placeholder="Define the character's personality traits..."></textarea>
+                            <textarea id="actor-personality" placeholder="Define the character's personality traits..." data-bind="actor.personality"></textarea>
                         </div>
                     </div>
                         
@@ -120,25 +120,18 @@
                 <div style="display:flex; flex-direction:row; gap: 10px;">
                     <button id="load-cast-button" class="btn load-btn">Load Cast</button>
                     <input type="file" id="cast-upload" accept="application/json" style="display:none;">
-                    <input id="cast-title" type="text" placeholder="Cast Title" style="flex:2;">
-                    <select id="cast-list" style="flex:1;">
+                    <input id="cast-title" type="text" placeholder="Cast Title" style="flex:2;" data-bind="cast.title">
+                    <select id="cast-list" style="flex:1;" array-bind="cast.cast" value="index" display="name">
                         <option disabled selected>Select a character from the cast...</option>
                     </select>
                     <button id="download-cast" class="btn save-btn">Save Cast</button>
                 </div>
                 
                 <div style="display:flex; flex-direction:column;flex: 1; gap: 10px;">
-                    <textarea id="cast-lore" placeholder="Enter lore or backstory for the cast..." style="flex: 1;"></textarea>
-                    <textarea id="cast-setting" placeholder="Describe the setting where this cast is placed..." style="flex: 1;"></textarea>
+                    <textarea id="cast-lore" placeholder="Enter lore or backstory for the cast..." style="flex: 1;" data-bind="cast.lore"></textarea>
+                    <textarea id="cast-setting" placeholder="Describe the setting where this cast is placed..." style="flex: 1;" data-bind="cast.setting"></textarea>
                 </div>
             </div>
-            <!--
-            <div class="cast-list">
-                <select id="cast-list">
-                    <option disabled selected>Select a character from the cast...</option>
-                </select>
-            </div>
-            -->
 
         </div>
     </div>
