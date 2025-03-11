@@ -36,6 +36,8 @@ class CastManager {
         return null;
     }
 
+
+
     // Method to initialize bindings
     initBindings() {
         // Query all elements with the data-bind attribute
@@ -257,6 +259,27 @@ class CastManager {
             this.updateUI(); // This will also load images and update the form field
         });
 
+        document.getElementById('new-actor-button').addEventListener('click', () => {  
+            this.createNewActor();
+        });
+    }
+
+    createNewActor() {
+        this.currentCast.cast.push({
+            name: "New Character",
+            age: 0,
+            description: "",
+            personality: "",
+            icon: "/static/images/default.jpg",
+            model: "",
+            instructions: "",
+            sfw: true,
+            pictures: []
+        });
+        this.currentActorIndex = this.currentCast.cast.length - 1;
+        this.updateUI();
+        this.bindSelectElements();
+        this.loadCurrentActorImages();
     }
 
     populateActorModelList(){

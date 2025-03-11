@@ -1,9 +1,10 @@
-from quart import Blueprint, request, jsonify
-from ollama_client import get_ollama_response, get_ollama_response_single
+from quart import Blueprint, request, jsonify, Response
+from ollama_client import get_ollama_response, get_ollama_response_single, stream_ollama_response_single
 from utils.message_utils import create_message, get_message_array, get_system_prompt
 from utils.character_utils import get_character, CharacterSchema, load_characters
 from quart import current_app
 import logging
+import asyncio
 
 chat_bp = Blueprint('chat', __name__)
 
@@ -12,6 +13,14 @@ def get_settings():
     settings = current_app.config['SETTINGS']
     return settings
 
+@chat_bp.route('/simple_stream', methods=['GET'])
+async def simple_stream():
+    async def generate():
+        for i in range(5):
+            yield f"data: Message {i}\n\n"
+            await asyncio.sleep(1)
+    
+    return Response(generate(), mimetype='text/event-stream')
 
 def build_conversation_prompt(char, conversation, respondents, title="", lore="", setting=""):
     conversation_prompt =  f"""
@@ -41,12 +50,49 @@ def build_conversation_prompt(char, conversation, respondents, title="", lore=""
     conversation_prompt += f"\n\n (IMPORTANT: Respond with only {char['name']}'s contribution.)\n\n{char['name']}:\n" #TODO: Add a setting for max response length
     return conversation_prompt
 
+# @chat_bp.route('/get_character_message', methods=['POST'])
+# async def get_character_message():
+#     data = await request.json
+    
+#     respondents = data.get("respondents", [])
+#     conversation = data.get("conversation", [])
+#     title = data.get("title", "")
+#     lore = data.get("lore", "")
+#     setting = data.get("setting", "")
+    
+#     app_settings = current_app.config['SETTINGS']
+    
+#     if len(respondents) == 0:
+#         return jsonify({"status": "error", "message": "No respondents provided"}), 400
+    
+#     if len(respondents) == 1:
+#         next_character = respondents[0]['name']
+#     else:
+#         settings = get_settings()
+#         attempts = settings['maximum_turn_taking_attempts']
+#         next_character = await AITurnPickNextCharacter(respondents, conversation, attempts)
+    
+#     char = get_character(respondents, next_character)
+    
+#     if not char:
+#         return jsonify({"status": "error", "message": "Character not found"}), 400
+    
+#     conversation_prompt = build_conversation_prompt(char, conversation, respondents, title, lore, setting)
+    
+#     async def generate():
+#         async for chunk in stream_ollama_response_single(char['model'], conversation_prompt, app_settings):
+#             yield f"data: {chunk}\n\n"
+    
+#     return Response(generate(), mimetype='text/event-stream')
 
 @chat_bp.route('/get_character_message', methods=['POST'])
 async def get_character_message():
     data = await request.json
     
+    #print(f"Got request for character message: {data}")
+    
     respondents = data.get("respondents", [])
+    #print(f"Respondents: {respondents}")
     conversation = data.get("conversation", [])
     title = data.get("title", "")
     lore = data.get("lore", "")
@@ -55,6 +101,7 @@ async def get_character_message():
     app_settings = current_app.config['SETTINGS']
     
     if len(respondents) == 0:
+        print("No respondents provided")
         return jsonify({"status": "error", "message": "No respondents provided"}), 400
     
     if len(respondents) == 1:
@@ -105,6 +152,7 @@ async def AITurnPickNextCharacter(respondents, chat_messages=[], turn=3, prompt=
     
     settings = get_settings()
     charmodel = settings['turn_taking_model']
+    #charmodel = "lumo-actor:latest"
     
     proposed_next = await get_ollama_response_single(charmodel, conversation_prompt, app_settings)
     

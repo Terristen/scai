@@ -104,7 +104,7 @@ def handle_file_upload(file, cache_directory):
 async def generate():
     settings = get_settings()
     server_address = settings.get("comfy_ip")
-    image_workflow = "user_content/workflows/quick_image.py"
+    image_workflow = settings.get("photo_workflow") #"user_content/workflows/quick_image.py"
     cache_directory = settings.get("cache_directory")
     default_photo_width = settings.get("default_photo_width", 768)
     default_photo_height = settings.get("default_photo_height", 1024)
@@ -179,7 +179,7 @@ async def get_photos(workflow, server_address, output_folder, args):
         except OSError as e:
             print(f"Error: {args['portrait']} : {e.strerror}")
             
-    
+     
     w = args.get("width", 768)
     h = args.get("height", 1024)
     
@@ -191,7 +191,7 @@ async def get_photos(workflow, server_address, output_folder, args):
     seed = args.get("seed")
     
     #print("age_adjust: ", age_adjust)    
-    prompt, calculatedSeed = workflow_module.GetWorkflow(comfy_filename, width=w, height=h, sfw=sfw, prompt=prompt, age_adjust=age_adjust, cfg=cfg, steps=steps, seed=seed)
+    prompt, calculatedSeed = workflow_module.GetWorkflow(comfy_filename, False, width=w, height=h, sfw=sfw, prompt=prompt, age_adjust=age_adjust, cfg=cfg, steps=steps, seed=seed)
     
     
     print(f"Connecting to Comfy server at {server_address} and client_id={session.get('client_id')}")
@@ -199,6 +199,7 @@ async def get_photos(workflow, server_address, output_folder, args):
     
     async with websockets.connect(ws_url) as comfy_ws:
         images = await get_images(comfy_ws, prompt, server_address, session.get('client_id'))
+        print(f"{len(images)} Images received")
     
     now = datetime.now()
     timestamp_str = now.strftime("%Y%m%d%H%M%S")

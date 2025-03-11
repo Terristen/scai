@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Event Listeners
     document.getElementById('sendButton').addEventListener('click', () => window.chatInstance.sendMessage());
+    document.getElementById('conversationManagerToggle').addEventListener('click', () => window.chatInstance.toggleConversationWindow());
+    document.getElementById('conversationManagerToggleCloseButton').addEventListener('click', () => window.chatInstance.toggleConversationWindow());
     document.getElementById('characterListToggle').addEventListener('click', () => window.chatInstance.toggleCharacterList());
     document.getElementById('message').addEventListener('input', () => {
         window.chatInstance.handleSendButtonText();
@@ -13,11 +15,12 @@ document.addEventListener('DOMContentLoaded', function () {
         window.chatInstance.toggleShortcutMenu();
     });
     document.getElementById('uploadCastButton').addEventListener('click', () => {
+        document.getElementById('castUpload').click();
+    });
+    document.getElementById('castUpload').addEventListener('change', (event) => {
         window.chatInstance.handleCastUploadForm();
     });
-    document.getElementById('loadCastButton').addEventListener('click', () => {
-        window.chatInstance.loadCast();
-    });
+    
 
     // Save and Load Conversation
     document.getElementById('saveConversationButton').addEventListener('click', () => {
@@ -53,13 +56,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     // Cast Editor Event Listeners
-    document.getElementById('editCastButton').addEventListener('click', () => {
-        window.chatInstance.toggleCastEditor();
-        window.chatInstance.populateCastEditor();
-    });
-    document.getElementById('saveCastButton').addEventListener('click', () => {
-        window.chatInstance.saveCastDetails();
-    });
+    // document.getElementById('editCastButton').addEventListener('click', () => {
+    //     window.chatInstance.toggleCastEditor();
+    //     window.chatInstance.populateCastEditor();
+    // });
+    // document.getElementById('saveCastButton').addEventListener('click', () => {
+    //     window.chatInstance.saveCastDetails();
+    // });
 
 
     // Update statistics when conversation changes

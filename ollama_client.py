@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 executor = ThreadPoolExecutor()
 
 def get_client(settings):
-    return ollama.Client(host=settings["ollama_url"], timeout=30)
+    return ollama.Client(host=settings["ollama_url"], timeout=60)
 
 def get_ollama_response(model, messages):
     client = get_client()
@@ -43,3 +43,13 @@ async def get_ollama_response_single(model, prompt, app_settings):
     loop = asyncio.get_event_loop()
     response = await loop.run_in_executor(executor, get_ollama_response_sync, model, prompt, app_settings)
     return response
+
+async def stream_ollama_response_single(model, prompt, app_settings):
+    client = get_client(app_settings)
+    response = client.generate(
+        model=model,
+        prompt=prompt,
+        stream=True
+    )
+    for chunk in response:
+        yield chunk['response']

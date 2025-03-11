@@ -44,16 +44,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // toggleCastWindow shortcut
-    document.addEventListener('keydown', function(event) {
-        if (event.altKey && event.key === '3') {
-            event.preventDefault();
-            window.chatInstance.toggleCastWindow();
-        }
-    });
+    // document.addEventListener('keydown', function(event) {
+    //     if (event.altKey && event.key === '3') {
+    //         event.preventDefault();
+    //         window.chatInstance.toggleCastWindow();
+    //     }
+    // });
 
     // toggleConversationWindow shortcut
     document.addEventListener('keydown', function(event) {
-        if (event.altKey && event.key === '4') {
+        if (event.altKey && event.key === '3') {
             event.preventDefault();
             window.chatInstance.toggleConversationWindow();
         }

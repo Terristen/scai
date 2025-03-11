@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <title>Chat</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     
     <!-- App Styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
@@ -28,9 +34,9 @@
 <body>
     <!-- Main menu -->
     <div class="sidebar">
-        <i class="fas fa-comments"></i>
-        <i class="fas fa-user-friends" id="characterListToggle"></i>
-        <i class="fas fa-cog" id="editCastButton"></i>
+        <i class="fas fa-comments" id="conversationManagerToggle"></i>
+        <i class="fa-solid fa-people-group" id="characterListToggle"></i>
+        <!-- <i class="fas fa-cog" id="editCastButton"></i> -->
     </div>
 
     <!-- Main content area of app -->
@@ -38,9 +44,10 @@
         
         <!-- Character list tray -->
         <div id="characterListHolder" class="character-list"> 
+            
             <div class="search-box">
-                <i class="fas fa-search"></i>
-                <input type="text" placeholder="Find">
+                <input type="file" id="castUpload" accept=".json" style="display:none;">
+                <button id="uploadCastButton">Load Cast</button>
             </div>
             <div id="characterList">
                 <!-- Character cards will be dynamically populated here -->
@@ -48,7 +55,7 @@
             <!-- Character cards will be dynamically populated here -->
         </div>
 
-        <!-- Cast editor tray -->
+        <!-- Cast editor tray 
         <div id="castEditorHolder" class="cast-editor">
             <div class="search-box">
                 <i class="fas fa-edit"></i>
@@ -70,6 +77,7 @@
                 <button id="saveCastButton">Save Cast File</button>
             </div>
         </div>
+        -->
 
         <!-- Chat container -->
         <div id="chatContainer" class="chat-container">
@@ -130,7 +138,7 @@
     </div>
 
     <!-- Popups -->
-    <!-- Modal for cast Management -->
+    <!-- Modal for cast Management 
     <div id="castManagementPopup" class="popup-overlay" style="display: none;">
         <div class="popup-content">
             <h2>Cast Management</h2>
@@ -141,10 +149,12 @@
             <button id="uploadCastButton">Upload Cast</button>
         </div>
     </div>
+    -->
 
     <!-- Modal for Conversation Management -->
     <div id="conversationManagementPopup" class="popup-overlay" style="display: none;">
-        <div class="popup-content">
+        <div class="popup-content" style="position:relative;">
+            <div id="conversationManagerToggleCloseButton" style="position: absolute;top: 5px;right: 5px;cursor: pointer;"><i class="fas fa-times"></i></div>
             <h2>Conversation Management</h2>
             <p>Load existing conversation or upload a conversation file.</p>
             
@@ -161,7 +171,7 @@
         </div>
     </div>
     
-    
+     
 
     <!-- Modal for Image Carousel -->
     <div id="imageCarouselModal" class="carousel-modal" style="display: none;">

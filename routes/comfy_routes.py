@@ -19,8 +19,13 @@ import aiohttp
 import aiofiles
 import asyncio
 import websockets
+import base64
 
 from concurrent.futures import ThreadPoolExecutor
+from aiohttp import MultipartWriter
+from aiohttp import FormData
+import importlib.util
+import secrets
 
 comfy_bp = Blueprint('comfy', __name__)
 
@@ -70,10 +75,11 @@ def sanitize_json_string(json_string):
         result += "}"
     
     return result
-
+  
 async def get_comfy_prompt_data(character, chat_messages=[],prompt=None):
     settings = get_settings()
     analysis_model = settings['analyst_model']
+    analysis_model = "lumo-actor:latest"
     
     conversation_prompt = ""
     if prompt:
@@ -81,16 +87,15 @@ async def get_comfy_prompt_data(character, chat_messages=[],prompt=None):
     else:
         conversation_prompt = f"""
         SYSTEM: You are an AI performing a precise function to read a story and return a correctly-formed JSON object that describes the character and the scene as it appears in the latest part of the story.
-        Story So Far:
+        Story:
         """
         for message in chat_messages:
             conversation_prompt += f"{message['content']}\n\n"
         
         conversation_prompt += f"""
-        Your answers should describe the character: 
+        Your answer should describe the character: 
         Name: {character['name']}
         Age: {character['age']}
-        Description: {character['description']}
         \n\n
         RESPONSE SCHEMA:
         Use the following JSON object to describe the character and the scene as it appears in the latest part of the story. Use short descriptive phrases for each field. Do not include names or other information that is not visual in nature. Avoid using any punctuation or special characters in the descriptions.
@@ -98,12 +103,10 @@ async def get_comfy_prompt_data(character, chat_messages=[],prompt=None):
         "gender"="(male or female)",
         "age"="(# years old)", 
         "ethnicity"="(any description of ethnicity appropriate for the character)",
-        "description"="(important physical characteristics of the character such as hair color, eye color, height, etc.)",
-        "attitude"="(the mood or attitude of the character in the conversation at this point)", 
         "pose"="(position or action the character is taking in the conversation at this point)", 
         "attire"="(description of clothing the character is wearing in the conversation at this point; nude if no clothing is present)",
-        "environment"="(the setting of the conversation that the character is in at this point)", 
-        "lighting"="(a description of the lighting in the scene where the character is at this point in the conversation)"
+        "expression"="(the facial expression of the character in the conversation at this point)",
+        "composition"="(the overall composition of the image to include setting, quality, and style)"
         }}
         """
         
@@ -130,21 +133,35 @@ async def get_comfy_prompt_data(character, chat_messages=[],prompt=None):
         
         return response
     
+def save_base64_image(base64_string, cache_directory):
+    # Decode the base64 string
+    header, encoded = base64_string.split(",", 1)
+    image_data = base64.b64decode(encoded)
 
+    # Generate a unique filename (you can use a timestamp, UUID, etc.)
+    filename = f"portrait_{secrets.token_hex(8)}.png"  # Or .jpg based on your use case
+    file_path = os.path.join(cache_directory, filename)
+    
+    # Save the image file
+    with open(file_path, "wb") as f:
+        f.write(image_data)
+    
+    return file_path
 
 #route to generate an image for a given character based on a fixed set of parameters only requires the character data object and the story array of messages
 @comfy_bp.route('/generate', methods=['POST'])
 async def generate():
     settings = get_settings()
     server_address = settings.get("comfy_ip")
-    image_workflow = settings.get("photo_workflow")
+    image_workflow = "user_content/workflows/quick_image.py"
     cache_directory = settings.get("cache_directory")
-    cast_photos_directory = settings.get("cast_photos_directory")
     default_photo_width = settings.get("default_photo_width", 768)
     default_photo_height = settings.get("default_photo_height", 1024)
     
     data = await request.json
+    files = await request.files
     
+    # go ask for a prompt
     character_data = data.get("character", None)
     if(character_data is None):
         return jsonify({"status": "error", "message": "No character data provided"}), 400
@@ -154,6 +171,7 @@ async def generate():
     prompt = await get_comfy_prompt_data(character_data,story_data, None)
     
     
+    #clean the prompt in case it is not a valid JSON object
     try:
         prompt_data = json.loads(prompt)
     except Exception as e:
@@ -166,70 +184,97 @@ async def generate():
     #print(prompt_data)
     
     
-    character = CharacterData(
-        character_data.get("name"),
-        path.join(cast_photos_directory, character_data["icon"]),
-        "8k ultra-detailed high contrast close-up portrait",
-        prompt_data.get("lighting", "brightly lit"),
-        prompt_data.get("gender",""),
-        prompt_data.get("age", "0") + " years old",
-        prompt_data.get("ethnicity", "ethnically ambiguous"),
-        prompt_data.get("description", "average"),
-        prompt_data.get("attitude", "neutral"),
-        prompt_data.get("pose", "standing"),
-        prompt_data.get("environment", "photographic studio"),
-        prompt_data.get("attire", "casual")
-    )
     
-    if(character_data.get("sfw", True) == False):
-        character.sfw = False
+    args = {}
     
-    ## TODO: parameterize the width and height of the image from settings
-    portrait_width = data.get("width", default_photo_width)
-    portrait_height = data.get("height", default_photo_height)
+    if "portrait" in data and data["portrait"]:
+        face_filename = save_base64_image(data["portrait"], cache_directory)
+        args["portrait"] = face_filename
+    else:
+        args["portrait"] = None
     
-    #print(character.portrait)
-    files = await get_character_photo(character, image_workflow, server_address, cache_directory, width=portrait_width, height=portrait_height)
     
-    result = {
-        "files": files,
-        "character": character.to_dict()
-    }
+    #loop through prompt data and concat keyvalue pairs to the prompt string with commas
     
-    return jsonify(result)
-
-class CharacterData:
-    def __init__(self, name, portrait, style, lighting, gender, age, ethnicity, description, attitude, pose, environment, attire, sfw=True):
-        self.name = name
-        self.portrait = portrait
-        self.style = style
-        self.lighting = lighting
-        self.gender = gender
-        self.age = age
-        self.ethnicity = ethnicity
-        self.description = description
-        self.attitude = attitude
-        self.pose = pose
-        self.environment = environment
-        self.attire = attire
-        self.sfw = sfw
+    args["prompt"] = ""
+    for key in prompt_data:
+        args["prompt"] += f'{key}={prompt_data[key]},'
     
-    def to_dict(self):
-        return {
-            "name": self.name,
-            "portrait": self.portrait,
-            "style": self.style,
-            "lighting": self.lighting,
-            "gender": self.gender,
-            "age": self.age,
-            "ethnicity": self.ethnicity,
-            "description": self.description,
-            "attitude": self.attitude,
-            "pose": self.pose,
-            "environment": self.environment,
-            "attire": self.attire,
-            "sfw": self.sfw
-        }
+    
+    args["sfw"] = data.get("sfw", False)
+    args["age_adjust"] = data.get("age_adjust", 0)
+    
+    args["width"] = data.get("portrait_width", default_photo_width)
+    args["height"] = data.get("portrait_height", default_photo_height)
+    
+    args["cfg"] = data.get("cfg", 3)
+    args["steps"] = data.get("steps", 20)
+    args["seed"] = data.get("seed")
+    
+    #print(args)
+    
+    images_pkg = await get_photos(image_workflow, server_address, cache_directory, args)
+    
+    # images_pkg = {
+    #     "images": [images_encoded],  # List of base64-encoded images
+    #     "seed": seed used to generate the images
+    # }
+    
+    return jsonify(images_pkg)
+    
+async def get_photos(workflow, server_address, output_folder, args):
+    then = datetime.now()
+    #print(args)
+    
+    print(f"Loading workflow module: {path.basename(workflow)}")
+    spec = importlib.util.spec_from_file_location("workflow_module", workflow)
+    workflow_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(workflow_module)
+    
+    print(f"Workflow module loaded in {datetime.now() - then}")
+    
+    comfy_filename = None
+    if(args["portrait"] is not None):
+        comfy_filename = path.basename(args["portrait"])
+        await upload_image(args["portrait"], comfy_filename, server_address, "input", True)
+        
+        try:
+            os.remove(args["portrait"])
+            print(f"Deleted {args['portrait']} from the server.")
+        except OSError as e:
+            print(f"Error: {args['portrait']} : {e.strerror}")
+            
+    
+    w = args.get("width", 768)
+    h = args.get("height", 1024)
+    
+    sfw = args.get("sfw", False)
+    prompt = args.get("prompt", "a person")
+    age_adjust = args.get("age_adjust", 0)
+    cfg = args.get("cfg", 3)
+    steps = args.get("steps", 20)
+    seed = args.get("seed")
+    
+    #print("age_adjust: ", age_adjust)    
+    prompt, calculatedSeed = workflow_module.GetWorkflow(comfy_filename, True, width=w, height=h, sfw=sfw, prompt=prompt, age_adjust=age_adjust, cfg=cfg, steps=steps, seed=seed)
+    
+    
+    print(f"Connecting to Comfy server at {server_address} and client_id={session.get('client_id')}")
+    ws_url = f"ws://{server_address}/ws?clientId={session.get('client_id')}"
+    
+    async with websockets.connect(ws_url) as comfy_ws:
+        images = await get_images(comfy_ws, prompt, server_address, session.get('client_id'))
+    
+    now = datetime.now()
+    timestamp_str = now.strftime("%Y%m%d%H%M%S")
+    
+    print(f"Images received in {now - then}s")
+    
+    print(f"Saving {len(images)} images to {output_folder}")
+    images = await encode_images(images)
+    #files = await save_images(images, output_folder, "portrait_" + then.strftime("%Y%m%d%H%M%S"))
+    
+    return {"seed": calculatedSeed, "images": images}
 
 
 #client_id = str(uuid.uuid4())
@@ -351,8 +396,7 @@ async def get_images(ws, prompt, server_address, client_id):
 #             output_images[node_id] = images_output
 
 #     return output_images
-from aiohttp import MultipartWriter
-from aiohttp import FormData
+
 
 async def upload_image(input_path, name, server_address, image_type="input", overwrite=False):
     async with aiohttp.ClientSession() as session:
@@ -385,22 +429,31 @@ async def upload_image(input_path, name, server_address, image_type="input", ove
   
 import os
 
-async def save_images(images, folder, filename_root):
-    image_names = []
-    imgnum = 0
-    now = datetime.now()
-    timestamp_str = now.strftime("%Y%m%d%H%M%S")
-
-    os.makedirs(folder, exist_ok=True)  # Ensure the folder exists
-
+async def encode_images(images):
+    encoded_images = []
+    
     for node_id in images:
         for i, image_data in enumerate(images[node_id]):
-            imgnum += 1
-            file_path = os.path.join(folder, f"{filename_root}_{timestamp_str}_{imgnum}.png")
-            async with aiofiles.open(file_path, 'wb') as f:
-                await f.write(image_data)
-                image_names.append(os.path.basename(file_path))
-    return image_names
+            encoded_images.append(base64.b64encode(image_data).decode('utf-8'))
+                
+    return encoded_images
+
+# async def save_images(images, folder, filename_root):
+#     image_names = []
+#     imgnum = 0
+#     now = datetime.now()
+#     timestamp_str = now.strftime("%Y%m%d%H%M%S")
+
+#     os.makedirs(folder, exist_ok=True)  # Ensure the folder exists
+
+#     for node_id in images:
+#         for i, image_data in enumerate(images[node_id]):
+#             imgnum += 1
+#             file_path = os.path.join(folder, f"{filename_root}_{timestamp_str}_{imgnum}.png")
+#             async with aiofiles.open(file_path, 'wb') as f:
+#                 await f.write(image_data)
+#                 image_names.append(os.path.basename(file_path))
+#     return image_names
 
 # def save_images(images, folder, filename_root):
 #     image_names = []
@@ -415,47 +468,60 @@ async def save_images(images, folder, filename_root):
 #                 image_names.append(path.basename(f.name))
 #     return image_names
 
-import importlib.util
 
-async def get_character_photo(character_data, workflow, server_address, output_folder, seed=None, **kwargs):
-    then = datetime.now()
+
+# async def get_character_photo(character_data, workflow, server_address, output_folder, seed=None, **kwargs):
+#     then = datetime.now()
     
-    print(f"Loading workflow module: {path.basename(workflow)}")
-    spec = importlib.util.spec_from_file_location("workflow_module", workflow)
-    workflow_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(workflow_module)
+#     print(f"Loading workflow module: {path.basename(workflow)}")
+#     spec = importlib.util.spec_from_file_location("workflow_module", workflow)
+#     workflow_module = importlib.util.module_from_spec(spec)
+#     spec.loader.exec_module(workflow_module)
     
-    print(f"Workflow module loaded in {datetime.now() - then}")
-    comfy_filename = path.basename(character_data.portrait)
+#     print(f"Workflow module loaded in {datetime.now() - then}")
     
-    print(f"Uploading image: {comfy_filename}")
-    await upload_image(character_data.portrait, comfy_filename, server_address, "input", True)
+#     # Write the base64 encoded portrait to a temporary file
+#     comfy_filename = f"{character_data.name}_portrait.png"  # You can customize the filename
+#     temp_file_path = path.join(output_folder, comfy_filename)
     
-    ## TODO: parameterize the width and height of the image from settings
-    w = kwargs.get("width", 768)
-    h = kwargs.get("height", 1024)
+#     with open(temp_file_path, "wb") as portrait_file:
+#         portrait_file.write(base64.b64decode(character_data.portrait))
+    
+#     print(f"Uploading image: {comfy_filename}")
+#     await upload_image(temp_file_path, comfy_filename, server_address, "input", True)
+    
+#     ## TODO: parameterize the width and height of the image from settings
+#     w = kwargs.get("width", 768)
+#     h = kwargs.get("height", 1024)
     
         
-    print(f"Evaluating workflow for {character_data.name} with width={w}, height={h}")
-    prompt = workflow_module.GetWorkflow(character_data, comfy_filename, width=w, height=h)
+#     print(f"Evaluating workflow for {character_data.name} with width={w}, height={h}")
+#     prompt = workflow_module.GetWorkflow(character_data, comfy_filename, width=w, height=h)
     
     
-    print(f"Connecting to Comfy server at {server_address} and client_id={session.get('client_id')}")
-    ws_url = f"ws://{server_address}/ws?clientId={session.get('client_id')}"
+#     print(f"Connecting to Comfy server at {server_address} and client_id={session.get('client_id')}")
+#     ws_url = f"ws://{server_address}/ws?clientId={session.get('client_id')}"
     
-    async with websockets.connect(ws_url) as comfy_ws:
-        #ping_task = asyncio.create_task(ping_ws(comfy_ws))
-        print(f"Submitting prompt for {character_data.name}")
-        images = await get_images(comfy_ws, prompt, server_address, session.get('client_id'))
+#     async with websockets.connect(ws_url) as comfy_ws:
+#         #ping_task = asyncio.create_task(ping_ws(comfy_ws))
+#         print(f"Submitting prompt for {character_data.name}")
+#         images = await get_images(comfy_ws, prompt, server_address, session.get('client_id'))
     
     
-    now = datetime.now()
-    timestamp_str = now.strftime("%Y%m%d%H%M%S")
+#     now = datetime.now()
+#     timestamp_str = now.strftime("%Y%m%d%H%M%S")
     
-    print(f"Images received in {now - then}s")
+#     print(f"Images received in {now - then}s")
     
-    print(f"Saving {len(images)} images to {output_folder}")
-    files = await save_images(images, output_folder, character_data.name)
-    return files
-
-
+#     print(f"Saving {len(images)} images to {output_folder}")
+#     #files = await save_images(images, output_folder, character_data.name)
+#     files = await encode_images(images)
+    
+#     # Delete the temporary portrait file after the process is complete
+#     try:
+#         os.remove(temp_file_path)
+#         print(f"Temporary file {temp_file_path} deleted successfully.")
+#     except Exception as e:
+#         print(f"Error deleting temporary file {temp_file_path}: {e}")
+    
+#     return files

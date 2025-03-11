@@ -1,23 +1,6 @@
 class Chat {
     constructor() {
-        this.currentCast = {
-            title: "New Cast",
-            lore: "",
-            setting: "",
-            cast: [
-                {
-                    name: "New Character",
-                    age: 0,
-                    description: "",
-                    personality: "",
-                    icon: "/static/images/default.jpg",
-                    model: "",
-                    instructions: "",
-                    sfw: true,
-                    pictures: []
-                }
-            ]
-        };
+        
 
 
         this.initTemplates();
@@ -43,7 +26,8 @@ class Chat {
         });
 
         Handlebars.registerHelper('iconRender', (icon) => {
-            return window.cast_photo_base_url + (icon === '' ? 'default.jpg' : icon);
+            //return icon; //window.cast_photo_base_url + (icon === '' ? 'default.jpg' : icon);
+            return (icon === '' ? window.cast_photo_base_url+'/default.jpg' : icon);
         });
 
         Handlebars.registerHelper('markdown', (text) => {
@@ -56,13 +40,44 @@ class Chat {
      */
     initVariables() {
         this.masterConversation = [];
-        this.currentCast = 'default.json';
+        this.currentCast = {
+            title: "New Cast",
+            lore: "",
+            setting: "",
+            cast: [
+                {
+                    name: "New Character",
+                    age: 0,
+                    description: "",
+                    personality: "",
+                    icon: "",
+                    model: "",
+                    instructions: "",
+                    sfw: true,
+                    pictures: []
+                }
+            ]
+        };
         this.characters = [];
         this.images = [];
         this.currentImageIndex = 0;
-        this.title = '';
-        this.lore = '';
-        this.setting = '';
+        
+    }
+
+    getCharactersLite() {
+        //return a lite version of the characters which is all the fields except for "icon" and "pictures"
+        let charactersLite = [];
+        for (let i = 0; i < this.characters.length; i++) {
+            let character = this.characters[i];
+            let characterLite = {};
+            for(let f in character) {
+                if(f !== "icon" && f !== "pictures") {
+                    characterLite[f] = character[f];
+                }
+            }
+            charactersLite.push(characterLite);
+        }
+        return charactersLite;
     }
 
     /**
@@ -70,7 +85,7 @@ class Chat {
      */
     initialFetches() {
         this.renderChat();
-        this.fetchCharacters();
+        //this.fetchCharacters();
     }
 
     /**
@@ -111,28 +126,28 @@ class Chat {
      * Fetch character data and cast metadata
      * @param {string} cast - Cast file name
      */
-    fetchCharacters(cast = "default.json") {
-        const url = new URL('/character/get_cast', window.location.origin);
-        url.searchParams.append('cast', encodeURIComponent(cast));
-        fetch(url, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            this.title = data.title;
-            this.lore = data.lore;
-            this.setting = data.setting;
-            this.characters = data.cast.map(character => ({
-                ...character,
-                selected: false,
-                personalitySnippet: `${character.personality.substring(0, 20)}...`
-            }));
-            this.renderCharacters();
-        });
-    }
+    // fetchCharacters(cast = "default.json") {
+    //     const url = new URL('/character/get_cast', window.location.origin);
+    //     url.searchParams.append('cast', encodeURIComponent(cast));
+    //     fetch(url, {
+    //         method: 'GET',
+    //         headers: {
+    //             'Content-Type': 'application/json',
+    //         }
+    //     })
+    //     .then(response => response.json())
+    //     .then(data => {
+    //         this.title = data.title;
+    //         this.lore = data.lore;
+    //         this.setting = data.setting;
+    //         this.characters = data.cast.map(character => ({
+    //             ...character,
+    //             selected: false,
+    //             personalitySnippet: `${character.personality.substring(0, 20)}...`
+    //         }));
+    //         this.renderCharacters();
+    //     });
+    // }
 
     /**
      * Send a message
@@ -141,7 +156,8 @@ class Chat {
     sendMessage(forcePass = false) {
         const message = document.getElementById('message').value.trim();
         const username = document.getElementById('username').value || 'User';
-        const respondents = this.characters.filter(character => character.selected);
+        const characterListLite = this.getCharactersLite();
+        const respondents = characterListLite.filter(character => character.selected);
 
         if (!forcePass && message) {
             const newMsg = { role: "user", content: message, character: username };
@@ -163,9 +179,9 @@ class Chat {
             body: JSON.stringify({
                 respondents,
                 conversation: this.masterConversation,
-                title: this.title,
-                lore: this.lore,
-                setting: this.setting
+                title: this.currentCast.title,
+                lore: this.currentCast.lore,
+                setting: this.currentCast.setting
             }),
         })
         .then(response => response.json())
@@ -174,10 +190,108 @@ class Chat {
             this.renderChat();
             const answeringCharacter = this.characters.find(character => character.name === data.assistant_message.character);
             if (answeringCharacter) {
-                this.addPortraitImage(window.cast_photo_base_url + answeringCharacter.icon);
+                this.addPortraitImage(answeringCharacter.icon);
             }
         });
     }
+
+    // async testStream() {
+    //     try {
+    //         const response = await fetch('/chat/simple_stream', {
+    //             method: 'GET',
+    //         });
+
+    //         const reader = response.body.getReader();
+    //         const decoder = new TextDecoder('utf-8');
+
+    //         const processStream = ({ done, value }) => {
+    //             if (done) return;
+
+    //             const chunk = decoder.decode(value, { stream: true });
+    //             const lines = chunk.split('\n\n');
+    //             lines.forEach(line => {
+    //                 if (line.startsWith('data: ')) {
+    //                     const message = line.replace('data: ', '');
+    //                     console.log('Message:', message);
+    //                     //document.getElementById('messages').innerHTML += `<p>${message}</p>`;
+    //                 }
+    //             });
+
+    //             return reader.read().then(processStream);
+    //         };
+
+    //         return reader.read().then(processStream);
+    //     } catch (error) {
+    //         console.error('Error with simple stream:', error);
+    //     }
+    // }
+
+
+    // sendMessage(forcePass = false) {
+    //     const message = document.getElementById('message').value.trim();
+    //     const username = document.getElementById('username').value || 'User';
+    //     const characterListLite = this.getCharactersLite();
+    //     const respondents = characterListLite.filter(character => character.selected);
+    
+    //     if (!forcePass && message) {
+    //         const newMsg = { role: "user", content: message, character: username };
+    //         this.masterConversation.push(newMsg);
+    //         this.renderChat();
+    //         document.getElementById('message').value = '';
+    //         this.autoGrowTextArea();
+    //     }
+    
+    //     if (respondents.length === 0) {
+    //         return;
+    //     }
+    
+    //     // Fetch with streaming response
+    //     fetch('/chat/get_character_message', {
+    //         method: 'POST',
+    //         headers: {
+    //             'Content-Type': 'application/json',
+    //         },
+    //         body: JSON.stringify({
+    //             respondents,
+    //             conversation: this.masterConversation,
+    //             title: this.currentCast.title,
+    //             lore: this.currentCast.lore,
+    //             setting: this.currentCast.setting
+    //         }),
+    //     })
+    //     .then(response => {
+    //         if (!response.ok) {
+    //             throw new Error('Failed to send message');
+    //         }
+    
+    //         const reader = response.body.getReader();
+    //         const decoder = new TextDecoder('utf-8');
+    //         const processStream = ({ done, value }) => {
+    //             if (done) return;
+    
+    //             const chunk = decoder.decode(value, { stream: true });
+    //             const lines = chunk.split('\n\n');
+    //             lines.forEach(line => {
+    //                 if (line.startsWith('data: ')) {
+    //                     const jsonData = JSON.parse(line.replace('data: ', ''));
+    //                     this.masterConversation.push({
+    //                         character: jsonData.character,
+    //                         content: jsonData.content,
+    //                         role: 'assistant'
+    //                     });
+    //                     this.renderChat(this.masterConversation);
+    //                 }
+    //             });
+    
+    //             return reader.read().then(processStream);
+    //         };
+    
+    //         return reader.read().then(processStream);
+    //     })
+    //     .catch(error => {
+    //         console.error('Error sending message:', error);
+    //     });
+    // }
 
     /**
      * Toggle character list visibility
@@ -311,24 +425,21 @@ class Chat {
      */
     async handleCastUploadForm() {
         const castUpload = document.getElementById('castUpload');
+
         const file = castUpload.files[0];
         if (file) {
-            const filename = file.name;
-            const formData = new FormData();
-            formData.append('cast_file', file);
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    this.currentCast = JSON.parse(e.target.result);
+                    this.characters = this.currentCast.cast;
+                    this.renderCharacters();
+                } catch (error) {
+                    console.error("Error parsing cast file:", error);
+                }
+            };
+            reader.readAsText(file);
 
-            try {
-                const response = await fetch('/character/upload_cast', {
-                    method: 'POST',
-                    body: formData,
-                });
-                const data = await response.json();
-                console.log('Success:', data);
-                await this.loadCast(filename);
-                await this.populateCastSelector();
-            } catch (error) {
-                console.error('Error:', error);
-            }
         }
     }
 
@@ -378,12 +489,13 @@ class Chat {
      */
     addGeneratedImage(imageUrl) {
         const tpl = Handlebars.compile(document.getElementById('image-template').innerHTML);
-        const newImage = tpl({ url: imageUrl });
+        const encodedUrl = "data:image/png;base64," + imageUrl
+        const newImage = tpl({ url: encodedUrl });
         const cont = document.getElementById('generatedImages');
-        cont.innerHTML += newImage;
-        cont.scrollTop = cont.scrollHeight;
-        this.images.push(imageUrl);
-        this.addImageClickListeners();
+        cont.insertAdjacentHTML('beforeend', newImage); // Use insertAdjacentHTML instead of innerHTML +=
+        cont.scrollTop = cont.scrollHeight; // Scroll to the bottom
+        this.images.push(encodedUrl); // Store the image URL (base64)
+        this.addImageClickListeners(); // Attach click listeners to the new image
     }
 
     /**
@@ -394,37 +506,59 @@ class Chat {
         const statusIndicator = document.getElementById('generationStatus');
         
         statusIndicator.className = 'generation-status loading';
-
+        
         let lastCharacter = null;
-
+        let charactersLite = this.getCharactersLite();
         for (let i = this.masterConversation.length - 1; i >= 0; i--) {
             if (this.masterConversation[i].role === "assistant") {
-                lastCharacter = this.getCharacterByName(this.masterConversation[i].character);
+                lastCharacter = charactersLite.find(character => character.name === this.masterConversation[i].character);
                 break;
             }
         }
 
         if (!lastCharacter) return;
+        const lcIcon = this.characters.find(character => character.name === lastCharacter.name).icon;
+
+        //lastCharacter["icon"] = lcIcon.split(",")[1]; //remove the data:image/png;base64, part
+
+        const formdata = {
+            character: lastCharacter,
+            story: this.masterConversation,
+            width: width,
+            height: height,
+            portrait:lcIcon
+        }
 
         fetch('/comfy/generate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ character: lastCharacter, story: this.masterConversation, width:width, height}),
+            body: JSON.stringify(formdata),
         })
         .then(response => response.json())
         .then(data => {
-            if (data.files.length > 0) {
-                const url = `/cache/${data.files[0]}`;
-                console.log('Image Prompt:', data.character);
-                this.addGeneratedImage(url);
+            if (data.images.length > 0) {
+                const img = data.images[0];
+                //img = data.images[0]; //should be in base64 format
+                this.addGeneratedImage(img);
                 statusIndicator.className = 'generation-status success';
             }
+
         }).catch(error => {
             statusIndicator.className = 'generation-status error';
         });
     }
+
+    async convertFileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = (error) => reject(error);
+        });
+    }
+
 
     /**
      * Carousel Functions
@@ -562,53 +696,53 @@ class Chat {
      /**
      * Toggle the cast editor visibility
      */
-     toggleCastEditor() {
-        const characterList = document.getElementById('castEditorHolder');
-        characterList.classList.toggle('show');
-    }
+    //  toggleCastEditor() {
+    //     const characterList = document.getElementById('castEditorHolder');
+    //     characterList.classList.toggle('show');
+    // }
 
     /**
      * Populate the cast editor with the current cast details
      */
-    populateCastEditor() {
-        document.getElementById('castFileName').value = this.currentCast;
-        document.getElementById('castTitle').value = this.title;
-        document.getElementById('castLore').value = this.lore;
-        document.getElementById('castSetting').value = this.setting;
+    // populateCastEditor() {
+    //     document.getElementById('castFileName').value = this.currentCast;
+    //     document.getElementById('castTitle').value = this.title;
+    //     document.getElementById('castLore').value = this.lore;
+    //     document.getElementById('castSetting').value = this.setting;
 
-        const characterNames = this.characters.map(character => character.name).join(', ');
-        document.getElementById('castCharacters').value = characterNames;
-    }
+    //     const characterNames = this.characters.map(character => character.name).join(', ');
+    //     document.getElementById('castCharacters').value = characterNames;
+    // }
 
     /**
      * Save the modified cast details to the server
      */
-    saveCastDetails() {
-        const updatedCast = {
-            title: document.getElementById('castTitle').value,
-            lore: document.getElementById('castLore').value,
-            setting: document.getElementById('castSetting').value,
-            cast: this.characters
-        };
+    // saveCastDetails() {
+    //     const updatedCast = {
+    //         title: document.getElementById('castTitle').value,
+    //         lore: document.getElementById('castLore').value,
+    //         setting: document.getElementById('castSetting').value,
+    //         cast: this.characters
+    //     };
 
-        fetch('/character/save_cast', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                castFileName: this.currentCast,
-                castData: updatedCast
-            }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Cast file saved successfully:', data);
-            // Optionally show a success message to the user
-        })
-        .catch(error => {
-            console.error('Error saving cast file:', error);
-            // Optionally show an error message to the user
-        });
-    }
+    //     fetch('/character/save_cast', {
+    //         method: 'POST',
+    //         headers: {
+    //             'Content-Type': 'application/json',
+    //         },
+    //         body: JSON.stringify({
+    //             castFileName: this.currentCast,
+    //             castData: updatedCast
+    //         }),
+    //     })
+    //     .then(response => response.json())
+    //     .then(data => {
+    //         console.log('Cast file saved successfully:', data);
+    //         // Optionally show a success message to the user
+    //     })
+    //     .catch(error => {
+    //         console.error('Error saving cast file:', error);
+    //         // Optionally show an error message to the user
+    //     });
+    // }
 }
