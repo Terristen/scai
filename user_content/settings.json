@@ -7,7 +7,7 @@
     "cast_of_characters_directory": "user_content/cast/",
     "default_cast": "default.json",
     "cast_photos_directory": "user_content/cast_photos/",
-    "username": "Bryan",
+    "username": "User",
     "comfy_ip": "127.0.0.1:8188",
     "photo_workflow": "user_content/workflows/quickpic.py",
     "default_photo_width": 768,
